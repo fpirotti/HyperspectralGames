@@ -1,0 +1,200 @@
+---
+title: "Hyperspectral Games"
+author: "..."
+date: "27/8/2020" 
+output:
+  html_document:
+ # ioslides_presentation: 
+    highlight: tango
+    incremental: yes
+    smaller: yes
+    transition: faster
+    widescreen: yes
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+<!-- ## Shiny Presentation -->
+
+<!-- The following single character keyboard shortcuts enable alternate display modes: -->
+
+<!-- 'f': enable fullscreen mode  -->
+<!-- 'w': toggle widescreen mode  -->
+<!-- 'o': enable overview mode  -->
+<!-- 'h': enable code highlight mode  -->
+<!-- 'p': show presenter notes -->
+
+<!-- Pressing Esc exits all of these modes -->
+
+
+## Grab the libraries 
+
+The libraries used can be seen from the namespace, i.e. the text before the function separated by "::"  e.g. the "raster" library is used to read the data, so "raster::brick" function is used.
+
+```{r message=FALSE }
+library(shinyWidgets)
+library(raster)
+library(rgdal)
+library(ggplot2)
+library(leaflet) 
+library(stars)
+library(plotly)
+library(readr)
+library(ggnewscale) # Multiple Fill and Color Scales in 'ggplot2'
+library(scico) # Colour Palettes Based on the Scientific Colour-Maps 
+library(ggrepel) # Automatically Position Non-Overlapping Text Labels with 'ggplot2'
+```
+
+## Read the data
+
+We read the two images
+
+```{r echo=TRUE }
+
+myImages<-list()
+
+swir.file<-"/archivio/home/pirotti/Google Drive/RAD_3451-1_SWIR_384me_SN3155_22000us_2020-02-11T144756_raw_rad.tif"
+vnir.file<-"/archivio/home/pirotti/Google Drive/RAD_3451-1_VNIR_1800_SN00852_22000us_2020-02-11T144756_raw_rad.tif"
+  
+myImages[['SWIR']]<-raster::brick(swir.file)
+myImages[['VNIR']]<-raster::brick(vnir.file)
+
+extent(myImages[['VNIR']]) <- extent(myImages[['SWIR']])
+
+### here we extract wavelengths from the band names
+swir.bands.wavelengths<-readr::parse_number(names(myImages[['SWIR']])) 
+vnir.bands.wavelengths<-readr::parse_number(names(myImages[['VNIR']])) 
+
+bands<-c( paste0("VNIR-", names(myImages[['VNIR']])),
+          paste0("SWIR-", names(myImages[['SWIR']]) ) )
+
+## trick to order the bands
+all.wavelengths<-c(vnir.bands.wavelengths, swir.bands.wavelengths )
+ord<-order(all.wavelengths)
+
+
+
+bands.ordered<-bands[ord]
+bands.ordered.w<-all.wavelengths[ord]
+
+bands.ordered.list<-as.list(bands.ordered)
+names(bands.ordered.list)<-bands.ordered.w
+# plot(swir.bands.wavelengths,rep(2, length(swir.bands.wavelengths)))
+# points(vnir.bands.wavelengths,rep(1.5, length(vnir.bands.wavelengths)), col="red"  )
+
+``` 
+
+## Plot Channels
+
+Assign 3 bands to give to screen channels...Red-Green-Blue from top to bottom respectively - wait around 60 seconds for resampling and plot redrawing
+
+```{r plot1}
+
+    shinyWidgets::sliderTextInput("bandR", 
+                                  label=NULL,
+                                   width="100%",
+                                  choices = bands.ordered.list,
+                                  selected = bands.ordered.list[[350]] )
+    shinyWidgets::sliderTextInput("bandG", 
+                                  label=NULL,
+                                   width="100%",
+                                  choices = bands.ordered.list,
+                                  selected = bands.ordered.list[[320]])
+    shinyWidgets::sliderTextInput("bandB", 
+                                  label=NULL,
+                                   width="100%",
+                                  choices = bands.ordered.list,
+                                  selected = bands.ordered.list[[280]])
+
+ plotOutput("plot1", click = "plot_click")
+
+
+ output$plot1 <- renderPlot({
+  req(input$bandR, input$bandG, input$bandB)
+   
+  p<-list()
+
+  for(i in c("bandR", "bandG", "bandB")){
+    img_and_band <- stringr::str_split(input[[i]], "-")[[1]]
+ 
+    p[[i]]<-myImages[[ img_and_band[[1]] ]][[   img_and_band[[2]] ]]
+     
+    if( !is.null(p$bandR) ){
+      p[[i]]<-raster::resample( p[[i]], p$bandR )
+    }
+  }
+  
+  final.raster<-raster::stack(p)
+
+  plotRGB(final.raster,
+      r = 1, g = 2, b = 3, 
+      scale=255,
+      stretch = "hist")
+
+})
+
+```
+
+&nbsp;
+ 
+
+```{r plot2}
+
+ plotlyOutput("graph1")
+output$graph1 <- renderPlotly({
+  
+    swir.values<-gdalUtils::gdallocationinfo(swir.file, input$plot_click$x,
+                                input$plot_click$y, valonly=T)
+    vnir.values<-gdalUtils::gdallocationinfo(vnir.file, input$plot_click$x,
+                                input$plot_click$y, valonly=T)
+    
+    vnir.values.num <- as.numeric(vnir.values)
+    swir.values.num <- as.numeric(swir.values)
+    
+    x.click<-as.integer(input$plot_click$x)
+    y.click<-as.integer(input$plot_click$y)
+    if(!shiny::isTruthy(x.click)) x.click<-0
+    if(!shiny::isTruthy(y.click)) y.click<-"0 - click image above."
+    p <- plot_ly(type="scatter",mode="markers")
+    p <- layout(p,  xaxis=list(title = "Wavelength (nm)"),
+                    yaxis=list(title = "Radiance at sensor ( ~reflectance )"), 
+                    title= sprintf("Spectral signature at X=%s Y=%s",  
+                                 x.click, y.click ) )
+    p <- add_trace(p, y=vnir.values.num, x=vnir.bands.wavelengths, name="VNIR",mode="markers")
+    p <- add_trace(p, y=swir.values.num, x=swir.bands.wavelengths, name="SWIR",mode="markers")
+    p
+    
+  }) 
+
+  observeEvent({input$plot_click$x
+                input$plot_click$y}, {
+    plotlyProxy("graph1", session) %>%
+    plotlyProxyInvoke("deleteTraces", list(as.integer(1))) %>%
+    plotlyProxyInvoke("addTraces", list(x=c(0, 0),y=c(1, 1),
+                        type = 'scatter',
+                        mode = 'markers'))
+  })
+  # renderPlot({
+#   req(input$BandsB, input$BandsG, input$BandsR)
+#    
+#   p<-list()
+#   
+#   for(i in c("R", "G", "B")){
+#     ww<-stringr::str_split(input[[i]], "-")[[1]]
+#     cat(ww, file = stderr() )
+#   } 
+#   
+#    
+# 
+# })
+
+```
+
+
+
+
+
+
