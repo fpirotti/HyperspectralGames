@@ -22,7 +22,6 @@ raster::extension(swir.file.out)<-"tif"
 gdalUtils::gdal_translate(swir.file, swir.file.out, srcwin = c(0, 0, 
                                                                xmax(swir.one.band)-1, 
                                                                ymax(swir.one.band)/2 ) )
-swir <-raster::stack(swir.file.out)
 
 
 vnir.file.out<-vnir.file
@@ -33,26 +32,3 @@ gdalUtils::gdal_translate(vnir.file, vnir.file.out, srcwin = c(0, 0,
                                                                xmax(vnir.one.band)-1, 
                                                                ymax(vnir.one.band)/2 ) )
 
-vnir <-raster::stack(vnir.file.out)
-
-
-### here we extract wavelengths from the band names
-swir.bands.wavelengths<-readr::parse_number(names(swir)) 
-vnir.bands.wavelengths<-readr::parse_number(names(vnir)) 
-
-extent(swir) <- extent(vnir)
-
-
-swir.vnir <- raster::stack(vnir, swir)
-
-vnir.res<-raster::aggregate(vnir, 4.6)
-
-plot(vnir[[1]])
-plot(swir[[1]], add=T)
-
-
-# Plot band 1
-plotRGB(vnir,
-        r = 1, g = 20, b = 39, 
-        scale=800,
-        stretch = "hist")

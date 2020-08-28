@@ -29,28 +29,32 @@ knitr::opts_chunk$set(echo = FALSE)
 
 <!-- Pressing Esc exits all of these modes -->
 
+## Notes
+
+Code available in GitHub [here](https://github.com/fpirotti/HyperspectralGames){target=_blank}
+
+The white target is a bit in the way, next time better to put it on top so it can be cropped out easily.  
+
+The cloth used as background is not "opaque" in the sense of Lambertian reflector (perfect diffusion)... it is translucid, reflecting the light source with directionality.
+
+
 
 ## Grab the libraries 
 
 The libraries used can be seen from the namespace, i.e. the text before the function separated by "::"  e.g. the "raster" library is used to read the data, so "raster::brick" function is used.
 
-```{r message=FALSE }
+```{r message=FALSE, echo=T }
 library(shinyWidgets)
 library(raster)
-library(rgdal)
-library(ggplot2)
-library(leaflet) 
-library(stars)
+library(rgdal) 
+library(ggplot2) 
 library(plotly)
-library(readr)
-library(ggnewscale) # Multiple Fill and Color Scales in 'ggplot2'
-library(scico) # Colour Palettes Based on the Scientific Colour-Maps 
-library(ggrepel) # Automatically Position Non-Overlapping Text Labels with 'ggplot2'
+library(readr) 
 ```
 
 ## Read the data
 
-We read the two images
+We read the two images that were previously cut (see file index.R which has some preprocessing steps)
 
 ```{r echo=TRUE }
 
@@ -61,6 +65,7 @@ vnir.file<-"/archivio/home/pirotti/Google Drive/RAD_3451-1_VNIR_1800_SN00852_220
   
 myImages[['SWIR']]<-raster::brick(swir.file)
 myImages[['VNIR']]<-raster::brick(vnir.file)
+
 
 extent(myImages[['VNIR']]) <- extent(myImages[['SWIR']])
 
