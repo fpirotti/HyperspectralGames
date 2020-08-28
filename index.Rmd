@@ -142,9 +142,9 @@ The code is not visible, check index.Rmd  in GitHub [directly here](https://gith
  
     p[[i]]<-myImages[[ img_and_band[[1]] ]][[   img_and_band[[2]] ]]
      
-    if( !is.null(curType) && curType!=img_and_band[[1]] ){
-      if(is.null(minType)) mainType<-curType
-      p[[i]]<-raster::resample( p[[i]], p[[mainType]] )
+    if( !is.null(curType) && (is.null(mainType) || mainType!=img_and_band[[1]]) ){
+      if(is.null(mainType)) mainType<-curType
+      if(mainType!=img_and_band[[1]]) p[[i]]<-raster::resample( p[[i]], myImages[[mainType]] )
     }
     curType<-img_and_band[[1]]
   }
