@@ -37,7 +37,9 @@ The white target is a bit in the way, next time better to put it on top so it ca
 
 The cloth used as background is not "opaque" in the sense of Lambertian reflector (perfect diffusion)... it is translucid, reflecting the light source with directionality.
 
+Image was cropped to save space and memory.
 
+The two sensors do not provide perfect overlap with a simple rescaling, because sensor geometry is different (focal length, lens distorsions etc...) you can check by 
 
 ## Grab the libraries 
 
@@ -94,7 +96,7 @@ names(bands.ordered.list)<-bands.ordered.w
 
 ## Plot Channels
 
-Assign 3 bands to give to screen channels...Red-Green-Blue from top to bottom respectively - wait around 60 seconds for resampling and plot redrawing
+Assign 3 bands to give to screen channels... Red - Green - Blue from top to bottom slider respectively - wait around 20 seconds for resampling and plot redrawing - takes more time if you choose the VNIR as it is a bigger image.
 
 ```{r plot1}
 
@@ -118,18 +120,20 @@ Assign 3 bands to give to screen channels...Red-Green-Blue from top to bottom re
 
 
  output$plot1 <- renderPlot({
+   
   req(input$bandR, input$bandG, input$bandB)
    
   p<-list()
-
+  curType<-NULL
   for(i in c("bandR", "bandG", "bandB")){
     img_and_band <- stringr::str_split(input[[i]], "-")[[1]]
  
     p[[i]]<-myImages[[ img_and_band[[1]] ]][[   img_and_band[[2]] ]]
      
-    if( !is.null(p$bandR) ){
+    if( !is.null(curType) && curType!=img_and_band[[1]] ){
       p[[i]]<-raster::resample( p[[i]], p$bandR )
     }
+    curType<-img_and_band[[1]]
   }
   
   final.raster<-raster::stack(p)
@@ -174,14 +178,14 @@ output$graph1 <- renderPlotly({
     
   }) 
 
-  observeEvent({input$plot_click$x
-                input$plot_click$y}, {
-    plotlyProxy("graph1", session) %>%
-    plotlyProxyInvoke("deleteTraces", list(as.integer(1))) %>%
-    plotlyProxyInvoke("addTraces", list(x=c(0, 0),y=c(1, 1),
-                        type = 'scatter',
-                        mode = 'markers'))
-  })
+  # observeEvent({input$plot_click$x
+  #               input$plot_click$y}, {
+  #   plotlyProxy("graph1", session) %>%
+  #   plotlyProxyInvoke("deleteTraces", list(as.integer(1))) %>%
+  #   plotlyProxyInvoke("addTraces", list(x=c(0, 0),y=c(1, 1),
+  #                       type = 'scatter',
+  #                       mode = 'markers'))
+  # })
   # renderPlot({
 #   req(input$BandsB, input$BandsG, input$BandsR)
 #    
@@ -198,8 +202,26 @@ output$graph1 <- renderPlotly({
 
 ```
 
+## OK let's classify!
+
+We will use only the SWIR because it is a lighter image and takes less time to process in real time and we do not want to be bored waiting for image to classify.
+
+Grab some training pixels by choosing the class and start clicking.
+
+
+... to be continued ....
 
 
 
 
+
+```{r  }
+ 
+  observeEvent({input$plot_click$x
+                input$plot_click$y}, {
+
+  })
+ 
+
+```
 
