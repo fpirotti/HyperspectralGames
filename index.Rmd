@@ -9,14 +9,23 @@ output:
     incremental: yes
     smaller: yes
     transition: faster
-    widescreen: yes
+    widescreen: yes  
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+      
 runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 ```
-
+```{css, echo=FALSE}
+.irs-bar-edge, .irs-bar {
+  display:none;
+}
+```
 <!-- ## Shiny Presentation -->
 
 <!-- The following single character keyboard shortcuts enable alternate display modes: -->
@@ -98,22 +107,22 @@ bands.ordered.list<-as.list(bands.ordered)
 
 Assign 3 bands to give to screen channels... Red - Green - Blue from top to bottom slider respectively - wait around 20 seconds for resampling and plot redrawing - takes more time if you choose the VNIR as it is a bigger image.
 
-The code is not visible, check index.Rmd  in GitHub [here](https://github.com/fpirotti/HyperspectralGames){target=_blank}
+The code is not visible, check index.Rmd  in GitHub [directly here](https://github.com/fpirotti/HyperspectralGames/blob/master/index.Rmd){target=_blank}
 
 ```{r plot1}
 
     shinyWidgets::sliderTextInput("bandR", 
-                                  label=NULL,
+                                  label="Red Channel",
                                    width="100%",
                                   choices = bands.ordered.list,
                                   selected = bands.ordered.list[[350]] )
     shinyWidgets::sliderTextInput("bandG", 
-                                  label=NULL,
+                                  label="Green Channel",
                                    width="100%",
                                   choices = bands.ordered.list,
                                   selected = bands.ordered.list[[320]])
     shinyWidgets::sliderTextInput("bandB", 
-                                  label=NULL,
+                                  label="Blue Channel",
                                    width="100%",
                                   choices = bands.ordered.list,
                                   selected = bands.ordered.list[[280]])
@@ -127,13 +136,15 @@ The code is not visible, check index.Rmd  in GitHub [here](https://github.com/fp
    
   p<-list()
   curType<-NULL
+  mainType<-NULL
   for(i in c("bandR", "bandG", "bandB")){
     img_and_band <- stringr::str_split(input[[i]], "-")[[1]]
  
     p[[i]]<-myImages[[ img_and_band[[1]] ]][[   img_and_band[[2]] ]]
      
     if( !is.null(curType) && curType!=img_and_band[[1]] ){
-      p[[i]]<-raster::resample( p[[i]], p$bandR )
+      if(is.null(minType)) mainType<-curType
+      p[[i]]<-raster::resample( p[[i]], p[[mainType]] )
     }
     curType<-img_and_band[[1]]
   }
@@ -190,16 +201,24 @@ We will use only the SWIR because it is a lighter image and takes less time to p
 Grab some training pixels by choosing the class and start clicking.
 
 
-... to be continued ....
+**... to be continued ....**
 
 
 
 
 
 ```{r  }
+
+mytraining.table <- data.frame(x=integer(0) , y=integer(0), Class=character(0))
+
   plotOutput("plot2", click = "plot_click2")
 
-selectInput("myClasss", label = "Choose class and click to add trainers", choices = c("Background", "White target", "Healty Plant", "Stressed Plant"))
+ fluidRow(
+   column(width=3, selectInput("myClass", label = "Choose class and click to add trainers", choices = c("Background", "White target", "Healty Plant", "Stressed Plant")) ),
+   column(width=9,
+          tableOutput("trainingTable")
+          ) 
+   )
  output$plot2 <- renderPlot({
    
   plotRGB(myImages$SWIR,
@@ -208,11 +227,22 @@ selectInput("myClasss", label = "Choose class and click to add trainers", choice
       stretch = "hist")
  })
  
-  observeEvent({input$plot_click2$x
-                input$plot_click2$y}, {
-    
-  })
+output$trainingTable <- renderTable({
+  req(input$plot_click2$x)
+    mytraining.table<<-rbind(mytraining.table, list(x=as.integer(input$plot_click2$x), y=as.integer(input$plot_click2$y), Class= isolate(input$myClass) ) )
+})
  
 
 ```
 
+
+&nbsp;
+
+
+&nbsp;
+
+
+&nbsp;
+
+
+&nbsp;
