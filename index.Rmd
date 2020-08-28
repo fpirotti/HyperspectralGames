@@ -31,7 +31,7 @@ knitr::opts_chunk$set(echo = FALSE)
 
 ## Notes
 
-Code available in GitHub [here](https://github.com/fpirotti/HyperspectralGames){target=_blank}
+Code of this file (index.Rmd) available in GitHub [here](https://github.com/fpirotti/HyperspectralGames){target=_blank}
 
 The white target is a bit in the way, next time better to put it on top so it can be cropped out easily.  
 
@@ -41,11 +41,12 @@ Image was cropped to save space and memory.
 
 The two sensors do not provide perfect overlap with a simple rescaling, because sensor geometry is different (focal length, lens distorsions etc...) you can check by 
 
-## Grab the libraries 
+## Load libraries
 
-The libraries used can be seen from the namespace, i.e. the text before the function separated by "::"  e.g. the "raster" library is used to read the data, so "raster::brick" function is used.
+It is a good habit in coding in R to use the namespace, i.e. include, before the function, the library it comes from, separated by "::"  e.g. the "raster" library is used to read the data, so write "raster::brick(....)".
 
-```{r message=FALSE, echo=T }
+```{r message=FALSE,  echo=TRUE }
+
 library(shinyWidgets)
 library(raster)
 library(rgdal) 
@@ -56,7 +57,7 @@ library(readr)
 
 ## Read the data
 
-We read the two images that were previously cut (see file index.R which has some preprocessing steps)
+We read the two images that were previously cut (see file index.R which has some preprocessing steps). Hint - try to use rgdal package which is much faster than the raster package for many things.
 
 ```{r echo=TRUE }
 
@@ -75,28 +76,29 @@ extent(myImages[['VNIR']]) <- extent(myImages[['SWIR']])
 swir.bands.wavelengths<-readr::parse_number(names(myImages[['SWIR']])) 
 vnir.bands.wavelengths<-readr::parse_number(names(myImages[['VNIR']])) 
 
+### here we put them in a string with a suffix with the sensor name, we will use this later to populate sliders for choosing the band combinations to plot and RGB image.
 bands<-c( paste0("VNIR-", names(myImages[['VNIR']])),
           paste0("SWIR-", names(myImages[['SWIR']]) ) )
 
-## trick to order the bands
+## trick to order the bands all together
 all.wavelengths<-c(vnir.bands.wavelengths, swir.bands.wavelengths )
+##  order function gives us a list of integers of the element position in the array in alphabetical order.
 ord<-order(all.wavelengths)
 
-
-
+## here we order the bands  
 bands.ordered<-bands[ord]
-bands.ordered.w<-all.wavelengths[ord]
+#bands.ordered.w<-all.wavelengths[ord]
 
+## an ordere list of sensor-band wavelength to add to the 3 sliders
 bands.ordered.list<-as.list(bands.ordered)
-names(bands.ordered.list)<-bands.ordered.w
-# plot(swir.bands.wavelengths,rep(2, length(swir.bands.wavelengths)))
-# points(vnir.bands.wavelengths,rep(1.5, length(vnir.bands.wavelengths)), col="red"  )
-
+  
 ``` 
 
 ## Plot Channels
 
 Assign 3 bands to give to screen channels... Red - Green - Blue from top to bottom slider respectively - wait around 20 seconds for resampling and plot redrawing - takes more time if you choose the VNIR as it is a bigger image.
+
+The code is not visible, check index.Rmd  in GitHub [here](https://github.com/fpirotti/HyperspectralGames){target=_blank}
 
 ```{r plot1}
 
@@ -178,27 +180,6 @@ output$graph1 <- renderPlotly({
     
   }) 
 
-  # observeEvent({input$plot_click$x
-  #               input$plot_click$y}, {
-  #   plotlyProxy("graph1", session) %>%
-  #   plotlyProxyInvoke("deleteTraces", list(as.integer(1))) %>%
-  #   plotlyProxyInvoke("addTraces", list(x=c(0, 0),y=c(1, 1),
-  #                       type = 'scatter',
-  #                       mode = 'markers'))
-  # })
-  # renderPlot({
-#   req(input$BandsB, input$BandsG, input$BandsR)
-#    
-#   p<-list()
-#   
-#   for(i in c("R", "G", "B")){
-#     ww<-stringr::str_split(input[[i]], "-")[[1]]
-#     cat(ww, file = stderr() )
-#   } 
-#   
-#    
-# 
-# })
 
 ```
 
@@ -216,10 +197,20 @@ Grab some training pixels by choosing the class and start clicking.
 
 
 ```{r  }
- 
-  observeEvent({input$plot_click$x
-                input$plot_click$y}, {
+  plotOutput("plot2", click = "plot_click2")
 
+selectInput("myClasss", label = "Choose class and click to add trainers", choices = c("Background", "White target", "Healty Plant", "Stressed Plant"))
+ output$plot2 <- renderPlot({
+   
+  plotRGB(myImages$SWIR,
+      r = 100, g = 60, b = 30, 
+      scale=255,
+      stretch = "hist")
+ })
+ 
+  observeEvent({input$plot_click2$x
+                input$plot_click2$y}, {
+    
   })
  
 
