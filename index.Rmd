@@ -251,7 +251,7 @@ fluidRow(
          inputId = "myClass",
          label = "Choose class",
          choices =  c("Background", "White target", "Healty Plant", "Stressed Plant"),
-         justified = TRUE,
+        # justified = TRUE,
          direction = "vertical",
          checkIcon = list(
             yes = icon("ok", 
@@ -271,6 +271,7 @@ fluidRow(
    )
  
   output$plot2 <- renderPlot({
+    
     req(input$plotTrain)
     plotRGB(myImages$SWIR,
         r = 100, g = 60, b = 30, 
@@ -321,7 +322,10 @@ observeEvent(input$plot_click2,  {
 fluidRow(
  column(width=12, shinyWidgets::addSpinner( plotOutput("plot3") ) ) 
  )
-  
+
+ fluidRow(
+ column(width=12, shinyWidgets::addSpinner( plotOutput("plot4") ) ) 
+ ) 
 
 observeEvent(input$runTrain, {
   
@@ -345,10 +349,11 @@ observeEvent(input$runTrain, {
    
   ss<-matrix(data=NA, nrow=nrow(react$train.table), ncol=length(swir.bands.wavelengths) )
   
-withProgress(message="Getting signatures", detail = sprintf("%s trainers", nrow(react$train.table)),
-             value=0, min=0, max=nrow(df),  { 
+withProgress(message="Getting signatures",
+             detail = sprintf("%s trainers", nrow(react$train.table)),
+             value=0, min=0, max=nrow(react$train.table),  { 
               for(i in 1:nrow(react$train.table) ){ 
-                  incProgress(as.integer(i))
+                  setProgress(as.integer(i))
                   ss[i, ]<- as.numeric( gdalUtils::gdallocationinfo(swir.file,                
                   react$train.table[i, "x"]  , react$train.table[i, "y"], valonly=T) )  
               }
@@ -389,8 +394,7 @@ withProgress(message="Getting signatures", detail = sprintf("%s trainers", nrow(
       theme_bw()
     print(p)
   })
-  
-  return(NULL) 
+   
   
   ###############################################################################
   ### from here  is AI -- our training data is  "train.data"
@@ -407,7 +411,11 @@ withProgress(message="Getting signatures", detail = sprintf("%s trainers", nrow(
   #### Import data to H2O cluster
   train<-  as.h2o(train.data)
   
-  grid<-  as.h2o( as.data.frame(myImages$SWIR) )
+withProgress(message="Intelligence going Artificial",
+             detail = "Converting image to matrix cube",
+             value=0,    { 
+               
+   grid<-  as.h2o( as.data.frame(myImages$SWIR) )
   #grid<- as.h2o(grid.data)
   
   #### Split data into train, validation and test dataset
@@ -416,13 +424,16 @@ withProgress(message="Getting signatures", detail = sprintf("%s trainers", nrow(
   # valid  <- h2o.assign(splits[[2]], "valid.hex") # 12%
   # test   <- h2o.assign(splits[[3]], "test.hex")  # 13%
   
-
-  
-  return(NULL)
+model.names<-list(RF="Random Forest",
+                  NB="Naive Bayes",
+                  GMB="GMB",
+                  DL="Deep Learning"  )
 
   y <- "Class"
   x <- setdiff(names(train.data), y)
   models<-list()
+  setProgress( value = 0.21 , detail = sprintf("Defining model with '%s'.", model.names[["RF"]] ) )
+  
   models[["RF"]] <- h2o.randomForest(x = x,
                              y = y,
                              ntrees = 10,
@@ -431,6 +442,7 @@ withProgress(message="Getting signatures", detail = sprintf("%s trainers", nrow(
                              binomial_double_trees = TRUE,
                              training_frame = train)
   
+  setProgress( value = 0.21 , detail = sprintf("Defining model with '%s'.", model.names[["NB"]] ) )
    models[["NB"]]  <- h2o.naiveBayes(x = x,
                           y = y,
                           training_frame = train,
@@ -438,6 +450,7 @@ withProgress(message="Getting signatures", detail = sprintf("%s trainers", nrow(
                           nfolds = 3,
                           seed = 1234)
    
+  setProgress( value = 0.21 , detail = sprintf("Defining model with '%s'.", model.names[["GMB"]] ) )
   models[["GMB"]]  <- h2o.gbm(x = x,
                   y = y,
                   training_frame = train, 
@@ -449,6 +462,7 @@ withProgress(message="Getting signatures", detail = sprintf("%s trainers", nrow(
                   keep_cross_validation_predictions = TRUE,
                   seed = 1)
   ### Deep Learning Model
+  setProgress( value = 0.21 , detail = sprintf("Defining model with '%s'.", model.names[["DL"]] ) )
  models[["DL"]]  <- h2o.deeplearning(
     model_id="Deep_Learning",                  # Destination id for this model
     training_frame=train,                      # Id of the training data frame
@@ -475,19 +489,28 @@ withProgress(message="Getting signatures", detail = sprintf("%s trainers", nrow(
     variable_importances=T
   )
 
+ 
  rasters<-list()
  for(i in names(models)){ 
+   
+    setProgress( value = 0.5 + length(rasters)/10 , detail = sprintf("Predicting with %s", model.names[[i]] ) )
     g.predict = as.data.frame(h2o.predict(object = models[[i]], newdata = grid))
     rasters[[i]] <-  raster(myImages$SWIR)  
     rasters[[i]][]  <- factor( g.predict$predict, levels=levels(train.data$Class) ) 
  } 
   
+  setProgress( value = 0.99, detail = "Stacking results" )
   rb<-raster::brick( rasters ) 
+  
+
+  })
   
   
   lu<-levelplot(rb,  
 		xlab = "X", ylab = "Y" ) 
-  lu 
+  
+  output$plot4 <- renderPlot({ lu })  
+  
 })
 ```
 
