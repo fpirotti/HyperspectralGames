@@ -1,27 +1,15 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2020.7.30)  28 AUG 2020 02:14
-entering extended mode
- restricted \write18 enabled.
- %&-line parsing enabled.
-**/tmp/RtmpFlL1Xj/file13d3c36b581d59.tex
-(/tmp/RtmpFlL1Xj/file13d3c36b581d59.tex
-LaTeX2e <2020-02-02> patch level 2
-L3 programming layer <2020-02-14>
-
-! LaTeX Error: Missing \begin{document}.
-
-See the LaTeX manual or LaTeX Companion for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.2 
-     
-Here is how much of TeX's memory you used:
- 18 strings out of 483183
- 612 string characters out of 5966292
- 231602 words of memory out of 5000000
- 15133 multiletter control sequences out of 15000+600000
- 532338 words of font info for 24 fonts, out of 8000000 for 9000
- 14 hyphenation exceptions out of 8191
- 12i,0n,15p,83b,20s stack positions out of 5000i,500n,10000p,200000b,80000s
-
-!  ==> Fatal error occurred, no output PDF file produced!
+  x   y
+ 30  17
+ 68  11
+162  13
+174  36
+107  70
+ 66  88
+ 42 112
+ 42 112
+ 39 141
+ 72 145
+ 82 165
+102 191
+ 61 192
+ 41 170

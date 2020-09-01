@@ -11,6 +11,12 @@ library(ggnewscale) # Multiple Fill and Color Scales in 'ggplot2'
 library(scico) # Colour Palettes Based on the Scientific Colour-Maps 
 library(ggrepel) # Automatically Position Non-Overlapping Text Labels with 'ggplot2'
 
+df.with.ss2  %>%  dplyr::group_by("Class") %>% dplyr::summarize_all( 
+  function(x) { 
+    if(is.numeric(x)) quantile(as.numeric(x), c(0.1,0.25, 0.5, 0.75, 0.9))
+    else c(0,0, 0, 0, 0)
+  } )
+
 
 ## PROCESSING
 swir.file<-"/archivio/home/pirotti/Google Drive/RAD_3451-1_SWIR_384me_SN3155_22000us_2020-02-11T144756_raw_rad.img"

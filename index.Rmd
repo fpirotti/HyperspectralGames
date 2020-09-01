@@ -62,6 +62,12 @@ library(rgdal)
 library(ggplot2) 
 library(plotly)
 library(readr) 
+library(dplyr)
+library(reshape2)
+library(shinyjs)
+library(rasterVis)
+library(h2o) ## A.I. library
+useShinyjs(rmd = TRUE)
 ```
 
 ## Read the data
@@ -73,11 +79,24 @@ We read the two images that were previously cut (see file index.R which has some
 myImages<-list()
 
 swir.file<-"/archivio/home/pirotti/Google Drive/RAD_3451-1_SWIR_384me_SN3155_22000us_2020-02-11T144756_raw_rad.tif"
-vnir.file<-"/archivio/home/pirotti/Google Drive/RAD_3451-1_VNIR_1800_SN00852_22000us_2020-02-11T144756_raw_rad.tif"
+vnir.file<-"/archivio/home/pirotti/Google Drive/RAD_3451-1_VNIR_1800_SN00852_22000us_2020-02-11T144756_raw_rad.tif" 
+swir.file2<-"/archivio/home/pirotti/Google Drive/RAD_3451-1_SWIR_384me_SN3155_22000us_2020-02-11T144756_raw_rad.img"
+vnir.file2<-"/archivio/home/pirotti/Google Drive/RAD_3451-1_VNIR_1800_SN00852_22000us_2020-02-11T144756_raw_rad.img"
+# vnir.file2<-"/archivio/home/pirotti/Google Drive/RAD_3451-1_VNIR_1800_SN00852_22000us_2020-02-11T144756_raw_rad2.tif" 
   
 myImages[['SWIR']]<-raster::brick(swir.file)
 myImages[['VNIR']]<-raster::brick(vnir.file)
 
+### read original just for band names!
+tmp.swir<-raster::brick(swir.file2)
+tmp.vnir<-raster::brick(vnir.file2)
+# myImages[['VNIR2']]<-raster::brick(vnir.file2)
+# 
+ names(myImages[['VNIR']])<-names(tmp.vnir)
+ names(myImages[['SWIR']])<-names(tmp.swir)
+ 
+ rm(tmp.swir)
+ rm(tmp.vnir)
 
 extent(myImages[['VNIR']]) <- extent(myImages[['SWIR']])
 
@@ -127,7 +146,7 @@ The code is not visible, check index.Rmd  in GitHub [directly here](https://gith
                                   choices = bands.ordered.list,
                                   selected = bands.ordered.list[[280]])
 
- imageOutput("plot1", click = "plot_click", width="100%") #width = xmax(myImages$SWIR) )
+ shinyWidgets::addSpinner( imageOutput("plot1", click = "plot_click", width="100%") )
 
  output$plot1 <- renderPlot({
    
@@ -137,8 +156,8 @@ The code is not visible, check index.Rmd  in GitHub [directly here](https://gith
   curType<-NULL
   mainType<-NULL
   for(i in c("bandR", "bandG", "bandB")){
-    img_and_band <- stringr::str_split(input[[i]], "-")[[1]]
- 
+    img_and_band <- stringr::str_split( isolate(input[[i]]), "-")[[1]]
+    print( isolate(input[[i]]) )
     p[[i]]<-myImages[[ img_and_band[[1]] ]][[   img_and_band[[2]] ]]
      
     if( !is.null(curType) && (is.null(mainType) || mainType!=img_and_band[[1]]) ){
@@ -150,6 +169,8 @@ The code is not visible, check index.Rmd  in GitHub [directly here](https://gith
   
   final.raster<-raster::stack(p)
 
+  print("here")
+  print(final.raster)
   plotRGB(final.raster,
       r = 1, g = 2, b = 3, 
       scale=255,
@@ -209,49 +230,266 @@ Grab some training pixels by choosing the class and start clicking.
 
 ```{r  }
 
-r <- reactiveValues( mytraining.table=data.frame(id=integer(0) , x=integer(0) , y=integer(0), Class=character(0)) )
- 
- 
-  plotOutput("plot2", click = "plot_click2")
+react <- reactiveValues(
+    train.table=data.frame(id=integer(0), x=integer(0) , y=integer(0), Class=character(0))
+)
+
+if( file.exists("/archivio/home/pirotti/tmp/train.table.rds") ){
+  
+  react$train.table <-  readRDS("/archivio/home/pirotti/tmp/train.table.rds")
+  
+}
+
+fluidRow(
+   column(width=12, shinyWidgets::addSpinner( plotOutput("plot2", click = "plot_click2") ) ) 
+   )
+  
 
  fluidRow(
-   column(width=3, selectInput("myClass", label = "Choose class and click to add trainers", choices = c("Background", "White target", "Healty Plant", "Stressed Plant")) ),
-   column(width=9,
-          tableOutput("trainingTable")
+   column(width=4, 
+        radioGroupButtons(
+         inputId = "myClass",
+         label = "Choose class",
+         choices =  c("Background", "White target", "Healty Plant", "Stressed Plant"),
+         justified = TRUE,
+         direction = "vertical",
+         checkIcon = list(
+            yes = icon("ok", 
+          lib = "glyphicon"))
+         ) 
+     ),
+   
+   column(width=5,
+          div(style="height:200px; overflow-y:auto;",  tableOutput("trainingTable") )
+          ),
+   
+   column(width=3, 
+          shiny::actionButton("plotTrain", label="PLOT", shiny::icon("pen"), inline=F ),
+          div(title="Removes all points!!", shiny::actionButton("resetTrain", label="RESET", shiny::icon("trash"), inline=F ) ),
+          shiny::actionButton("runTrain",  label="RUN", shiny::icon("gear"), inline=F )
           ) 
    )
  
   output$plot2 <- renderPlot({
-   
+    req(input$plotTrain)
     plotRGB(myImages$SWIR,
         r = 100, g = 60, b = 30, 
-        scale=255,
+        scale=255, axes=T, main="Choose class below and click on image to add trainers",
         stretch = "hist")
+    
+    isolate({ 
+      
+      if(shiny::isTruthy(react$train.table) && nrow(react$train.table) ){
+        
+        col<-RColorBrewer::brewer.pal(6, "Paired" )
+        col2<-RColorBrewer::brewer.pal(6, "Pastel2" )
+        train.table.classes<-as.factor( react$train.table$Class )
+        
+        points(react$train.table$x, react$train.table$y, col=col[train.table.classes], bg=col2[train.table.classes], pch = 21 )
+        
+        text(react$train.table$x, react$train.table$y,   pos=2, react$train.table$id, col=col[train.table.classes] )
+        
+        } 
+      })
   
  })
  
   
-output$trainingTable <- renderTable({
-  
-  req(input$plot_click2$x)
-  
+output$trainingTable <- renderTable({ react$train.table })
+
+observeEvent(input$resetTrain,  { 
   isolate({
-    
-      r$mytraining.table<-rbind(r$mytraining.table, list(id=as.integer(nrow(r$mytraining.table)+1),  x=as.integer(input$plot_click2$x), y=as.integer(input$plot_click2$y), Class= input$myClass ) )
-      
-      table<-r$mytraining.table
+      react$train.table <- data.frame(id=integer(0), x=integer(0) , y=integer(0), Class=character(0)) 
   })
-  table
- # print(table)
-   
+})
+
+observeEvent(input$plot_click2,  { 
+  isolate({
+      react$train.table <- rbind(react$train.table, list(id=as.integer(nrow(react$train.table)+1),  x=as.integer(input$plot_click2$x), y=as.integer(input$plot_click2$y), Class= input$myClass ) )
+  }) 
 })
  
 
 ```
 
+#### Let's get fancy ... Deep Learning or A.I. 
 
-&nbsp;
+....
 
+```{r echo=T}
+
+fluidRow(
+ column(width=12, shinyWidgets::addSpinner( plotOutput("plot3") ) ) 
+ )
+  
+
+observeEvent(input$runTrain, {
+  
+  req(input$runTrain, react$train.table)
+   
+  saveRDS(react$train.table, "/archivio/home/pirotti/tmp/train.table.rds") 
+  
+  if(nrow(react$train.table)<10) {
+    shinyWidgets::alert("At least 40 points - 10 per class please", status="warning")
+    shinyjs::alert("At least 40 points - 10 per class please")
+    return(NULL)
+  }
+  
+  if( sum(  table(react$train.table$Class)<10 ) != 0 ){
+    print("hhh222")
+    whi<-paste0(collapse=", ", names( which( table(react$train.table$Class)<20 ) ) )
+    shinyWidgets::alert(sprintf("At least 10 points per class please! Class %s have too few points.", whi), status="warning")
+    shinyjs::alert(sprintf("At least 10 points per class please! Class %s have too few points.", whi))
+    return(NULL)
+  }
+   
+  ss<-matrix(data=NA, nrow=nrow(react$train.table), ncol=length(swir.bands.wavelengths) )
+  
+withProgress(message="Getting signatures", detail = sprintf("%s trainers", nrow(react$train.table)),
+             value=0, min=0, max=nrow(df),  { 
+              for(i in 1:nrow(react$train.table) ){ 
+                  incProgress(as.integer(i))
+                  ss[i, ]<- as.numeric( gdalUtils::gdallocationinfo(swir.file,                
+                  react$train.table[i, "x"]  , react$train.table[i, "y"], valonly=T) )  
+              }
+             }
+)
+  
+ if( is.null(ss) ){  
+    shinyjs::alert("ISNULL!")
+    return(NULL)
+ }
+  
+  train.data<-as.data.frame( cbind(react$train.table[c("Class")], ss  ) )
+ 
+  ###############################################################################
+  ### from here  is only for plotting - our training data is  "train.data"
+  quants<-c(0.1,0.25, 0.5, 0.75, 0.9)
+  df.with.ss2 <- train.data  %>%  dplyr::group_by(Class) %>% dplyr::summarize_all( 
+  function(x) { 
+    if(is.numeric(x)) quantile(as.numeric(x), quants)
+    else c(0,0, 0, 0, 0)
+  } )
+ 
+  df.with.ss2$Quantile<-rep( sprintf("Q%s", quants*100), length(unique(df.with.ss2$Class)) )
+  #saveRDS(as.data.frame(df.with.ss2), "df.with.ss2.rds")
+  
+  df.with.ss3<- reshape2::melt(df.with.ss2 )
+  df.with.ss4<- reshape2::dcast(df.with.ss3 ,   Class+variable ~ Quantile )  
+  df.with.ss4$Wavelength<- swir.bands.wavelengths[ df.with.ss4$variable ]
+  df.with.ss4[df.with.ss4==0]<-NA
+  
+  output$plot3 <- renderPlot({
+    p<-ggplot(df.with.ss4,  aes(x=Wavelength, y=Q50, group=Class, fill=Class, color=Class)  ) + 
+        geom_point( ) + 
+        geom_ribbon( aes( ymin=Q25,  ymax=Q75 ),   alpha=.3, linetype=0 ) + 
+      xlab("Wavelength (nm)") +
+      ylab("Radiance at sensor") +
+      ggtitle("Trainer signatures - Q50 and IQR") + 
+      theme_bw()
+    print(p)
+  })
+  
+  return(NULL) 
+  
+  ###############################################################################
+  ### from here  is AI -- our training data is  "train.data"
+  ## losely from https://github.com/zia207/Satellite-Images-Classification-with-H2O-R
+  train.data$Class<-as.factor(train.data$Class)
+  
+  ### to make things faster I  select only 40 spectral bands... 288 are too many, getting close to overfitting - BUT 
+  ### I use to most important ones... which are they? 
+ # cols<-sample(1:length(swir.bands.wavelengths), 50)
+#  train.data2<-train.data[, c("Class", as.character(cols))]
+  
+  names(train.data)<-c("Class", names(myImages$SWIR) )
+  localH2o <- h2o.init(nthreads = 10, max_mem_size = "50G") 
+  #### Import data to H2O cluster
+  train<-  as.h2o(train.data)
+  
+  grid<-  as.h2o( as.data.frame(myImages$SWIR) )
+  #grid<- as.h2o(grid.data)
+  
+  #### Split data into train, validation and test dataset
+  # splits <- h2o.splitFrame(df, c(0.75,0.125), seed=1234)
+  # train  <- h2o.assign(splits[[1]], "train.hex") # 75%
+  # valid  <- h2o.assign(splits[[2]], "valid.hex") # 12%
+  # test   <- h2o.assign(splits[[3]], "test.hex")  # 13%
+  
+
+  
+  return(NULL)
+
+  y <- "Class"
+  x <- setdiff(names(train.data), y)
+  models<-list()
+  models[["RF"]] <- h2o.randomForest(x = x,
+                             y = y,
+                             ntrees = 10,
+                             max_depth = 5,
+                             min_rows = 10, 
+                             binomial_double_trees = TRUE,
+                             training_frame = train)
+  
+   models[["NB"]]  <- h2o.naiveBayes(x = x,
+                          y = y,
+                          training_frame = train,
+                          laplace = 0,
+                          nfolds = 3,
+                          seed = 1234)
+   
+  models[["GMB"]]  <- h2o.gbm(x = x,
+                  y = y,
+                  training_frame = train, 
+                  ntrees = 10,
+                  max_depth = 3,
+                  min_rows = 2,
+                  learn_rate = 0.2,
+                  nfolds = 3,
+                  keep_cross_validation_predictions = TRUE,
+                  seed = 1)
+  ### Deep Learning Model
+ models[["DL"]]  <- h2o.deeplearning(
+    model_id="Deep_Learning",                  # Destination id for this model
+    training_frame=train,                      # Id of the training data frame
+  #  validation_frame=valid,                    # Id of the validation data frame 
+    x=x,                                       # a vector predictor variable
+    y=y,                                       # name of reponse vaiables
+    standardize=TRUE,                          # standardize the data
+    score_training_samples=0,                  # training set samples for scoring (0 for all)
+    activation = "RectifierWithDropout",       # Activation function
+    score_each_iteration = TRUE,              
+    hidden = c(200,200,200,200),               # 4 hidden layers, each of 200 neurons
+    hidden_dropout_ratios=c(0.2,0.1,0.1,0),    # for improve generalization
+    stopping_tolerance = 0.001,                # tolerance for metric-based stopping criterion
+    epochs=100,                                # the dataset should be iterated (streamed)
+    adaptive_rate=TRUE,                        # manually tuned learning rate
+    l1=1e-6,                                   # L1/L2 regularization, improve generalization
+    l2=1e-6,
+    max_w2=10,                                 # helps stability for Rectifier
+    nfolds=3,                                 # Number of folds for K-fold cross-validation
+    fold_assignment="Stratified",              # Cross-validation fold assignment scheme
+    keep_cross_validation_fold_assignment = TRUE,
+    seed=125,
+    reproducible = TRUE,
+    variable_importances=T
+  )
+
+ rasters<-list()
+ for(i in names(models)){ 
+    g.predict = as.data.frame(h2o.predict(object = models[[i]], newdata = grid))
+    rasters[[i]] <-  raster(myImages$SWIR)  
+    rasters[[i]][]  <- factor( g.predict$predict, levels=levels(train.data$Class) ) 
+ } 
+  
+  rb<-raster::brick( rasters ) 
+  
+  
+  lu<-levelplot(rb,  
+		xlab = "X", ylab = "Y" ) 
+  lu 
+})
+```
 
 &nbsp;
 
