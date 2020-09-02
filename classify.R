@@ -17,6 +17,14 @@ myImages.SWIR<-raster::brick(swir.file)
 
 swir.bands.wavelengths<-readr::parse_number(names(myImages.SWIR)) 
 
+## a look-up list for name of method
+model.names <- list(RF = "Random Forest",
+                    NB = "Naive Bayes",
+                    GMB = "GMB",
+                    DL = "Deep Learning",
+                    KNN = "K Nearest Neighbour",
+                    SVM = "Support Vector Machine")
+
 ## training info - points with XY and Class information ... 
 train.table <-  readRDS("train.table.rds")
 head(train.table)
@@ -186,7 +194,7 @@ rasters<-list()
 
 for (i in names(models)) {
   print("Predicting with...")
-  print(i)
+  print( model.names[[i]] )
   ## save the model if you want
   ## h2o.saveModel(models[[i]], ....)
   
@@ -194,17 +202,17 @@ for (i in names(models)) {
   g.predict = as.data.frame(  h2o.predict(object = models[[i]], newdata = grid)  )
   
   ## empty raster same size and resolution as original
-  rasters[[i]] <-  raster(myImages.SWIR)
+  rasters[[ model.names[[i]]  ]] <-  raster(myImages.SWIR)
   
   ## here we make sure that all classes are factorized, as some results only have some of the
   ## classes and this messes up the Raster - see https://rdrr.io/cran/raster/man/factor.html
-  rasters[[i]][]  <-    factor(g.predict$predict, levels = levels(train.data$Class))
+  rasters[[ model.names[[i]] ]][]  <-    factor(g.predict$predict, levels = levels(train.data$Class))
 }
 
 #h2o.shutdown(prompt = F)
 rb <- raster::brick(rasters)
 
-levelplot(rb,  xlab = "X", ylab = "Y")
+levelplot(rb,  xlab = "X", ylab = "Y", main="Models from H2O library")
 
 ############ END  MODELING WITH H2O  ##############
 
@@ -216,22 +224,22 @@ rasters.rminer<-list()
 models.rminer<-list()
 
 models.rminer[["SVM"]] <- rminer::fit(Class~.,data=train.data, task="class",  model="ksvm", feature="s") 
-rasters.rminer[["SVM"]] <- rminer::predict(  myImages.SWIR, models.rminer[["SVM"]] )
+rasters.rminer[[ model.names[[ "SVM" ]]  ]] <- rminer::predict(  myImages.SWIR, models.rminer[["SVM"]] )
 
 
 models.rminer[["RF"]] <- rminer::fit(Class~.,data=train.data, task="class",  model="randomForest") 
-rasters.rminer[["RF"]] <- rminer::predict(  myImages.SWIR, models.rminer[["RF"]] )
+rasters.rminer[[ model.names[[ "RF" ]]  ]] <- rminer::predict(  myImages.SWIR, models.rminer[["RF"]] )
 
 
 models.rminer[["KNN"]] <- rminer::fit(Class~.,data=train.data, task="class",  model="knn") 
-rasters.rminer[["KNN"]] <- rminer::predict(  myImages.SWIR, models.rminer[["KNN"]] )
+rasters.rminer[[ model.names[[ "KNN" ]]    ]] <- rminer::predict(  myImages.SWIR, models.rminer[["KNN"]] )
 
 
-models.rminer[["NAIVE"]] <- rminer::fit(Class~.,data=train.data, task="class",  model="naive") 
-rasters.rminer[["NAIVE"]] <- rminer::predict(  myImages.SWIR, models.rminer[["NAIVE"]] )
+models.rminer[["lssvm"]] <- rminer::fit(Class~.,data=train.data, task="class",  model="lssvm") 
+rasters.rminer[[ "least squares SVM"   ]] <- rminer::predict(  myImages.SWIR, models.rminer[["lssvm"]] )
 
 rb.rminer <- raster::brick(rasters.rminer)
-levelplot( rb.rminer,  xlab = "X", ylab = "Y")
+levelplot(rb.rminer,  xlab = "X", ylab = "Y", main="Models from rminer library")
 
 # models[["rminerRPART"]] <- mining(Class~.,data=train.data,Runs=10,method=c("kfold",3,123),model="rpart")
 # print(mmetric(M,metric="CONF"))
