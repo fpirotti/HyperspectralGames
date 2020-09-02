@@ -38,9 +38,9 @@ knitr::opts_chunk$set(echo = FALSE)
 
 <!-- Pressing Esc exits all of these modes -->
 
-## Notes
+## Heads Up
 
-Code of this file (index.Rmd) available in GitHub [here](https://github.com/fpirotti/HyperspectralGames){target=_blank}
+**Code of this file (index.Rmd) available in GitHub [here](https://github.com/fpirotti/HyperspectralGames){target=_blank}**
 
 The white target is a bit in the way, next time better to put it on top so it can be cropped out easily.  
 
