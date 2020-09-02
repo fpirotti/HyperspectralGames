@@ -17,9 +17,32 @@ myImages.SWIR<-raster::brick(swir.file)
 
 swir.bands.wavelengths<-readr::parse_number(names(myImages.SWIR)) 
 
-## training info
-train.table <-  readRDS("/archivio/home/pirotti/tmp/train.table.rds")
+## training info - points with XY and Class information ... 
+train.table <-  readRDS("train.table.rds")
 head(train.table)
+
+plotRGB( flip( raster::stack(myImages.SWIR[[220]], myImages.SWIR[[100]], myImages.SWIR[[20]]  ) , direction = "y"),
+        r = 1,
+        g = 2,
+        b = 3,
+        scale = 255,
+        axes = T,
+        stretch = "hist")
+ 
+
+col <- RColorBrewer::brewer.pal(6, "Paired")
+col2 <- RColorBrewer::brewer.pal(6, "Pastel2")
+train.table.classes <- as.factor(train.table$Class)
+
+points(
+  train.table$x,
+  train.table$y,
+  col = col[train.table.classes],
+  bg = col2[train.table.classes],
+  pch = 21
+)
+
+
 
 ## nice empty matrix with reflectance/radiance data... 
 ## each ROW is a training point, and each COLUMN is a value of the image pixel
@@ -45,7 +68,22 @@ for (i in 1:nrow( train.table)) {
     )
 }
 
-
+# yy<- 
+#   gdalUtils::gdallocationinfo(
+#      swir.file, raw_output=F,
+#     coords = as.matrix(train.table[, c("x", "y") ]),
+#     valonly = T
+#   )
+ 
+ 
+  # gdalUtils::gdallocationinfo(
+  #   srcfile=swir.file,
+  #   coords= as.matrix( train.table[, c("x", "y") ] ) , 
+  #   valonly = T
+  # )
+ 
+write.csv(train.table, "/archivio/home/pirotti/Google Drive/RAD_3451-1_SWIR_384me_SN3155_22000us_2020-02-11T144756_raw_rad.csv", row.names = F)
+ 
 ## here we create a table from the matrix with signatures above adding the "Class" column
 train.data <-  as.data.frame(cbind(train.table[c("Class")], ss))
 ## here we make sure that "Class" is a "FACTOR" column...
@@ -62,12 +100,12 @@ localH2o <- h2o.init(nthreads = 10, max_mem_size = "50G")
 
  
 train <-  as.h2o(train.data)
-grid <-  as.h2o(as.data.frame(myImages.SWIR ))
+grid <-   as.h2o(as.data.frame(myImages.SWIR ))
 
 y <- "Class"
 x <- setdiff(names(train.data), y)
-models <- list()
 
+models <- list()
 
 models[["RF"]] <- h2o.randomForest(
   x = x,
@@ -145,6 +183,7 @@ models[["DL"]]  <- h2o.deeplearning(
 
 ## empty container for predicted (classified) rasters
 rasters<-list()
+
 for (i in names(models)) {
   print("Predicting with...")
   print(i)
@@ -152,7 +191,7 @@ for (i in names(models)) {
   ## h2o.saveModel(models[[i]], ....)
   
   ## Predict class at all pixels
-  g.predict = as.data.frame(h2o.predict(object = models[[i]], newdata = grid))
+  g.predict = as.data.frame(  h2o.predict(object = models[[i]], newdata = grid)  )
   
   ## empty raster same size and resolution as original
   rasters[[i]] <-  raster(myImages.SWIR)

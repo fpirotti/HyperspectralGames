@@ -183,7 +183,7 @@ output$plot1 <- renderPlot({
   #   print("here")
   #   print(final.raster)
   plotRGB(
-    final.raster,
+    flip(final.raster, direction =  "y"),
     r = 1,
     g = 2,
     b = 3,
@@ -317,14 +317,16 @@ fluidRow(
   )
 )
 
+plotBrick<- flip ( raster::stack( myImages$SWIR[[250]], myImages$SWIR[[100]], myImages$SWIR[[10]]), direction = "y" )
+
 output$plot2 <- renderPlot({
   req(input$plotTrain)
   
   plotRGB(
-    myImages$SWIR,
-    r = 100,
-    g = 60,
-    b = 30,
+    plotBrick,
+    r = 1,
+    g = 2,
+    b = 3,
     scale = 255,
     axes = T,
     main = "Choose class below and click on image to add trainers",
