@@ -41,9 +41,6 @@ knitr::opts_chunk$set(echo = FALSE)
 
 <!-- Pressing Esc exits all of these modes -->
 
-## Note introduttive
-
-**Il codice in R di questo esercizio è disponibile in GitHub [QUI](https://github.com/fpirotti/HyperspectralGames){target=_blank}**
 
 
 ```{css}
@@ -81,9 +78,11 @@ div.main-container{
  var initialized = false;
  
  $('#plot1').on('DOMSubtreeModified', 'img', function(){
-  console.log(this);
-  
   imageZoom( this, "myresult" );
+});
+
+ $('#plot2').on('DOMSubtreeModified', 'img', function(){
+  imageZoom( this, "myresult2" );
 });
 
  function imageZoom(img, resultID) {
@@ -170,10 +169,7 @@ library(h2o) ## A.I. library
 useShinyjs(rmd = TRUE)
 
 ```
-
-## Read the data
-
-We read the two images that were previously cut (see file index.R which has some preprocessing steps). Hint - try to use rgdal package which is much faster than the raster package for many things.
+ 
 
 ```{r }
 
@@ -199,7 +195,17 @@ bands<-names(myImage)
 
 ``` 
 
-## Immagine Sentinel-2 L2A
+## Note introduttive
+
+**Il codice in R di questo esercizio è disponibile in GitHub [QUI](https://github.com/fpirotti/HyperspectralGames){target=_blank}**
+
+Immagine Sentinel-2 L2A ripresa su Padova il giorno 24 aprile 2018. E' visibile Prato della Valle.
+
+Esercizio: raccogliete 4 firme spettrali, di elementi diversi, e.g. il canale, urbanizzato, vegetazione e la zona industriale.
+
+
+
+## Firme spettrali
 
 
 
@@ -229,10 +235,11 @@ fluidRow(
           )    
     ),
   
-  column( 6,    div( id="myresult", class="img-zoom-result" )  )
+  column( 6,    div( id="myresult",   class="img-zoom-result", div(style="border:2px solid red; width:10px; height:10px; margin:105px auto;  ") )  )
   
 )
 ```
+
 ### Doppio click per singola firma spettrale - singolo click per aggiungerla
 
 ```{r }
@@ -243,9 +250,10 @@ fluidRow(
   column( 6,    imageOutput("plot1", width = 672, height= 474,
     dblclick = "plot_dblclick", click = "plot_click" )   ),
   
-  column( 6,    plotlyOutput("graph1") )
+  column( 6,    plotlyOutput("graph1"), shiny::actionButton("resetGraph", "Reset Grafico Firme Spettrali") )
   
 )
+
 output$plot1 <- renderPlot({
   
   req(input$bandR, input$bandG, input$bandB)
@@ -261,28 +269,24 @@ output$plot1 <- renderPlot({
   
 })
 
-
-
-
-
-
  
 
-observeEvent(input$plot_dblclick, {
+observeEvent(input$plot_click, {
   
-  req(input$plot_dblclick)
-  values <- gdalUtils::gdallocationinfo(img.file, input$plot_dblclick$x,
-                                input$plot_dblclick$y, geoloc=T, valonly = T)
+  req(input$plot_click)
+  values <- gdalUtils::gdallocationinfo(img.file, input$plot_click$x,
+                                input$plot_click$y, geoloc=T, valonly = T)
  
   values.num <- as.numeric(values) 
   
-  x.click <- as.integer(input$plot_dblclick$x)
-  y.click <- as.integer(input$plot_dblclick$y)
-  
+  x.click <- as.integer(input$plot_click$x)
+  y.click <- as.integer(input$plot_click$y)
+
+      
   plotlyProxyInvoke(plotlyProxy("graph1", session), "addTraces", list(
     list(
       x = bands.wavelengths.nm,
-      y = values.num,
+      y = values.num / 10000,
       type = 'scatter',
       mode = 'markers+lines',  line = list(shape = "spline")
     )
@@ -291,36 +295,21 @@ observeEvent(input$plot_dblclick, {
   
 })
 
+  
 
 output$graph1 <- renderPlotly({
-  
-  req(input$plot_click$x)
-  #shinyjs::runjs( '  if(!initialized) imageZoom("plot1", "myresult")' );
-
-  print(input$plot_click$x)
-  values <- gdalUtils::gdallocationinfo(img.file, input$plot_click$x,
-                                input$plot_click$y, geoloc=T, valonly = T)
  
-  values.num <- as.numeric(values) 
-  
-  x.click <- as.integer(input$plot_click$x)
-  y.click <- as.integer(input$plot_click$y)
-  
-  if (!shiny::isTruthy(x.click))
-    x.click <- 0
-  if (!shiny::isTruthy(y.click))
-    y.click <- "0 - click image above."
+  input$resetGraph
   
   p <- plot_ly(type = "scatter", mode = "markers") %>% layout( 
-    xaxis = list(title = "Wavelength (nm)"),
-    yaxis = list(title = "Radiance at sensor ( ~reflectance )"),
-    title = sprintf("Spectral signature at X=%s Y=%s",
-                    x.click, y.click)
-  ) %>% add_trace(
-      y = values.num,
-      x =  bands.wavelengths.nm,
-      mode = "markers+lines",  line = list(shape = "spline")
-  ) # %>% add_lines(  x =  bands.wavelengths.nm, y =values.num,   line = list(shape = "spline") )
+    xaxis = list(title = "Lunghezza d'Onda (nm)"),
+    yaxis = list(title = "Riflettanza Bottom-Of-Atmosphere (BOA)"),
+    title = sprintf("Firma spettrale")
+   ) # %>% add_trace(
+  #     y = values.num / 10000,
+  #     x =  bands.wavelengths.nm,
+  #     mode = "markers+lines",  line = list(shape = "spline")
+  # ) # %>% add_lines(  x =  bands.wavelengths.nm, y =values.num,   line = list(shape = "spline") )
   
   p
   
@@ -332,17 +321,14 @@ model.names <- list(RF = "Random Forest",
                     DL = "Deep Learning")
 ```
 
-## OK let's classify!
+## Classificazione "supervisionata"
 
 We will use only the SWIR because it is a lighter image and takes less time to process in real time and we do not want to be bored waiting for image to classify.
 
 1. Grab some training pixels by choosing the class and start clicking on the image below.
 2. Click **PLOT** if you want to redraw the points that were clicked (image is NOT auto-updated)
 3. Once finished **clic "RUN"** to start training/validation/testing phase of the following models:
- ```{r  } 
- print(model.names)
- ```
- 4. You will see a plot of signatures AND classified images
+4. You will see a plot of signatures AND classified images
 
 
 
@@ -362,14 +348,16 @@ if (file.exists("s2.train.table.rds")) {
   
 }
 
-fluidRow(column(width = 12, shinyWidgets::addSpinner(
-  plotOutput("plot2", click = "plot_click2")
-)))
+ 
 
+fluidRow( 
 
-fluidRow(
+  column( 6,    plotOutput("plot2", width = 672, height= 474,
+    dblclick = "plot_dblclick2", click = "plot_click2" )   ),
+  
+
   column(
-    width = 4,
+    width = 3,
     radioGroupButtons(
       inputId = "myClass",
       label = "Scegli la classe per ROI",
@@ -378,25 +366,26 @@ fluidRow(
       direction = "vertical",
       checkIcon = list(yes = icon("ok",
                                   lib = "glyphicon"))
-    )
-  ),
-  
-  column(
-    width = 5,
-    div(style = "height:200px; overflow-y:auto;",  tableOutput("trainingTable"))
+    ),
+    
+   div(style="display:inline-block;", shinyWidgets::actionBttn("plotTrain", label = "RiDisegna", size = "xs", block = F, style = "fill",   shiny::icon("pen"))  ),
+    div(style="display:inline-block;float:left",
+      title = "Removes all points!!",
+      shinyWidgets::actionBttn("resetTrain", label = "RESET", size = "xs",block = F, style = "fill",   shiny::icon("trash"))
+    ),
+    div(style="display:inline-block;float:left;",  shinyWidgets::actionBttn("runTrain",  label = "Elabora",  size = "xs", block = F, style = "fill",  shiny::icon("gear")) ),
+    div( id="myresult2",   class="img-zoom-result", div(style="border:2px solid red; width:10px; height:10px; margin:105px auto;  ") ) 
   ),
   
   column(
     width = 3,
-    shiny::actionButton("plotTrain", label = "Disegna", shiny::icon("pen")),
-    div(
-      title = "Removes all points!!",
-      shiny::actionButton("resetTrain", label = "RESET", shiny::icon("trash"))
-    ),
-    shiny::actionButton("runTrain",  label = "Elabora", shiny::icon("gear"))
+    div(style = "height:474px; overflow-y:auto;",  tableOutput("trainingTable"))
   )
+  
 )
 
+
+ 
  
 
 output$plot2 <- renderPlot({
@@ -483,7 +472,7 @@ observeEvent(input$runTrain, {
   
   req(input$runTrain, react$train.table)
   
-  saveRDS(react$train.table, "s2.train.table.rds")
+ # saveRDS(react$train.table, "s2.train.table.rds")
   
   if (nrow(react$train.table) < 10) {
     shinyWidgets::alert("Almeno 10 punti di ROI per classe", status =
@@ -568,7 +557,7 @@ observeEvent(input$runTrain, {
   df.with.ss4 <-
     reshape2::dcast(df.with.ss3 ,   Class + variable ~ Quantile)
   df.with.ss4$Wavelength <-
-    swir.bands.wavelengths[df.with.ss4$variable]
+    bands.wavelengths.nm[df.with.ss4$variable]
   df.with.ss4[df.with.ss4 == 0] <- NA
   
   output$plot3 <- renderPlot({
@@ -600,10 +589,10 @@ observeEvent(input$runTrain, {
   
   ### to make things faster I  select only 40 spectral bands... 288 are too many, getting close to overfitting - BUT
   ### I use to most important ones... which are they?
-  # cols<-sample(1:length(swir.bands.wavelengths), 50)
+  # cols<-sample(1:length(bands.wavelengths.nm), 50)
   #  train.data2<-train.data[, c("Class", as.character(cols))]
   
-  names(train.data) <- c("Class", names(myImages$SWIR))
+  names(train.data) <- c("Class", names(myImage))
   localH2o <- h2o.init(nthreads = 10, max_mem_size = "50G")
   #### Import data to H2O cluster
   train <-  as.h2o(train.data)
@@ -612,7 +601,7 @@ observeEvent(input$runTrain, {
                detail = "Converting image to matrix cube",
                value = 0,
                {
-                 grid <-  as.h2o(as.data.frame(myImages$SWIR))
+                 grid <-  as.h2o(as.data.frame(myImage))
                  #grid<- as.h2o(grid.data)
                  
                  #### Split data into train, validation and test dataset
@@ -717,7 +706,7 @@ observeEvent(input$runTrain, {
                      detail = sprintf("Predicting with %s", model.names[[i]])
                    )
                    g.predict = as.data.frame(h2o.predict(object = models[[i]], newdata = grid))
-                   rasters[[i]] <-  raster(myImages$SWIR)
+                   rasters[[i]] <-  raster(myImage)
                    rasters[[i]][]  <-
                      factor(g.predict$predict, levels = levels(train.data$Class))
                  }
