@@ -1,10 +1,10 @@
 ---
-title: "Giochi di Analisi Immagini Digitali"
+title: "Classificare Immagini Digitali: dai metodi classici all'Intelligenza Artificiale"
 author: "Francesco Pirotti - CIRGEO / TESAF  - Università di Padova"
 date: "27/8/2020" 
 output:
   html_notebook: 
-    toc: yes
+    toc_float: yes
   html_document:
  # ioslides_presentation: 
     highlight: tango 
@@ -14,6 +14,11 @@ output:
       smooth_scroll: no
 runtime: shiny
 ---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE )
+```
+
 ```{r, echo=FALSE}
 shiny::addResourcePath("shinyjs", system.file("srcjs", package = "shinyjs"))
 ```
@@ -21,9 +26,7 @@ shiny::addResourcePath("shinyjs", system.file("srcjs", package = "shinyjs"))
 shinyjs::useShinyjs(html = TRUE)
 ```
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
-```
+
 ```{css, echo=FALSE}
 .irs-bar-edge, .irs-bar {
   display:none;
@@ -47,6 +50,13 @@ knitr::opts_chunk$set(echo = FALSE)
 
 * {box-sizing: border-box;}
 
+.shiny-notification {
+              height: 200px;
+              width: 800px;
+              position:fixed;
+              top: calc(50% - 50px);;
+              left: calc(50% - 400px);;
+            }
 .img-zoom-container {
   position: relative;
 }
@@ -171,7 +181,7 @@ useShinyjs(rmd = TRUE)
 ```
  
 
-```{r }
+```{r message=FALSE }
 
 myImages<-list()
 
@@ -182,7 +192,8 @@ myImage<-raster::brick(img.file, values=TRUE)
  
 # myImages[['VNIR2']]<-raster::brick(vnir.file2)
 # 
- names(myImage)<- c( "490nm", "560nm", "665nm", "705nm", "740nm", "783nm", "842nm", "865nm", "1610nm", "2190nm" ) 
+bands<-c( "490nm", "560nm", "665nm", "705nm", "740nm", "783nm", "842nm", "865nm", "1610nm", "2190nm" )  
+names(myImage)<- bands
   
  
 
@@ -190,7 +201,7 @@ myImage<-raster::brick(img.file, values=TRUE)
 bands.wavelengths.nm<-readr::parse_number(names(myImage)) 
 
 ### here we put them in a string with a suffix with the sensor name, we will use this later to populate sliders for choosing the band combinations to plot and RGB image.
-bands<-names(myImage)
+names(bands)<-  sprintf( "%s - %s (%s)", c(  "B2", "B3", "B4","B5", "B6","B7", "B8","B8A","B11", "B12"), bands, c(  "10m", "10m", "10m","20m", "20m","20m", "10m","20m","20m", "20m") )
 
 
 ``` 
@@ -199,58 +210,79 @@ bands<-names(myImage)
 
 **Il codice in R di questo esercizio è disponibile in GitHub [QUI](https://github.com/fpirotti/HyperspectralGames){target=_blank}**
 
-Immagine Sentinel-2 L2A ripresa su Padova il giorno 24 aprile 2018. E' visibile Prato della Valle.
+Nelle sezioni seguenti vedrete un ritaglio di un'immagine  Sentinel-2 L2A ripresa sopra la città di Padova il giorno 24 aprile 2018 (noterete facilmente in alto a destra Prato della Valle). Sono riportate solo le [bande a 10 m e 20 m del sensore Sentinel 2](https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_S2_SR#bands){target=_blank}.
 
-Esercizio: raccogliete 4 firme spettrali, di elementi diversi, e.g. il canale, urbanizzato, vegetazione e la zona industriale.
+Ogni sezione consente di interagire con l'immagine per analizzarne alcuni aspetti:
+
+- La visualizzazione a schermo 
+- La firma spettrale su un punto
+- Le operazioni per la classificazione supervisionata (i.e. con il supporto dell'operatore):
+  - La definizione di punti sull'immagine per l'addestramento del modello  (punti definiti anche ROI/POI - regions/points of interest, regioni/punti di interesse)
+  - La creazione di modelli predittivi usanto i POI e:
+    - metodi classici (Maximum Likelyhood, Spectral Angle Mapper, Minimum Distance)
+    - metodi di A.I. - machine learning  (Random Forest, Support Vector Machine)
+    - metodi di A.I. - Deep Learning (reti neurali multi-strato...)
+- Le operazioni di analisi dell'accuratezza stimata mediante matrici di confronto con un riferimento
+  - Indici aggregati di accuratezza per classe e totali (indice Kappa, AUC, precisione/recupero, falsi positivi, F-score, etc...)
+
+
+All'inizio di ogni sezione viene proposto un esercizio che potete eseguire con l'interfaccia.
+
 
 
 
 ## Firme spettrali
 
+**Esercizio:** raccogliete 4 firme spettrali, di elementi diversi, e.g. il canale, urbanizzato, vegetazione e la zona industriale.
 
 
-```{r }
-fluidRow(
-  column(6, 
-         shinyWidgets::sliderTextInput(
-            "bandR",
-            label = "Rosso",
-            width = "100%",
-            choices = bands,
-            selected = bands[[3]]
-          ),
-         shinyWidgets::sliderTextInput(
-            "bandG",
-            label = "Verde",
-            width = "100%",
-            choices = bands ,
-            selected = bands[[2]]
-          ),
-         shinyWidgets::sliderTextInput(
-            "bandB",
-            label = "Blue",
-            width = "100%",
-            choices = bands ,
-            selected = bands[[1]]
-          )    
-    ),
-  
-  column( 6,    div( id="myresult",   class="img-zoom-result", div(style="border:2px solid red; width:10px; height:10px; margin:105px auto;  ") )  )
-  
-)
-```
 
 ### Doppio click per singola firma spettrale - singolo click per aggiungerla
 
 ```{r }
 
+   choicesOpt <- list(
+      style = sprintf("background-color:%s88;", c( "#0000ff", "#00ff00,", "#ff0000", "#a50026", "#a50026",
+                                                   "#0000ff", "#00ff00,", "#ff0000", "#a50026", "#a50026" ) ) )
 
-fluidRow( 
-
-  column( 6,    imageOutput("plot1", width = 672, height= 474,
-    dblclick = "plot_dblclick", click = "plot_click" )   ),
+fluidRow(  
   
-  column( 6,    plotlyOutput("graph1"), shiny::actionButton("resetGraph", "Reset Grafico Firme Spettrali") )
+  column( 4, style="margin:0; margin-bottom:10px; width:680px !important;",    imageOutput("plot1", width = 672, height= 474,
+    dblclick = "plot_dblclick", click = "plot_click" )  ),
+  column(2, style="margin:0; width:220px !important; margin-bottom:10px;",
+       div(
+         shiny::actionButton("resetGraph", "Cancella Firme Spettrali"),
+           shinyWidgets::pickerInput(
+              "bandR",
+              label = "Rosso",
+              width = 220,
+              choices = bands,
+              selected = bands[[3]],
+              choicesOpt = choicesOpt
+            ),
+           
+           shinyWidgets::pickerInput(
+              "bandG",
+              label = "Verde",
+              width = 220,
+              choices = bands ,
+              selected = bands[[2]]
+            ),
+           shinyWidgets::pickerInput(
+              "bandB",
+              label = "Blue",
+              width = 220,
+              choices = bands ,
+              selected = bands[[1]]
+            )
+       ),
+         div( id="myresult",   class="img-zoom-result", 
+              div(style="border:2px solid red; width:10px; height:10px; margin:105px auto;  ") )
+    ),
+  
+  
+  
+  column( 4,  style="margin:0; width:220px !important; margin-bottom:10px;",  plotlyOutput("graph1", width=500) )
   
 )
 
@@ -304,7 +336,7 @@ output$graph1 <- renderPlotly({
   p <- plot_ly(type = "scatter", mode = "markers") %>% layout( 
     xaxis = list(title = "Lunghezza d'Onda (nm)"),
     yaxis = list(title = "Riflettanza Bottom-Of-Atmosphere (BOA)"),
-    title = sprintf("Firma spettrale")
+    title = sprintf("Firme spettrale")
    ) # %>% add_trace(
   #     y = values.num / 10000,
   #     x =  bands.wavelengths.nm,
@@ -317,7 +349,8 @@ output$graph1 <- renderPlotly({
 
 model.names <- list(RF = "Random Forest",
                     NB = "Naive Bayes",
-                    GMB = "GMB",
+                    GMB = "Gradient Boosting Machine",
+                    SVM= "Support Vector Machine",
                     DL = "Deep Learning")
 ```
 
@@ -467,6 +500,8 @@ fluidRow(column(width = 12, shinyWidgets::addSpinner(plotOutput("plot3"))))
 
 fluidRow(column(width = 12, shinyWidgets::addSpinner(plotOutput("plot4"))))
 
+fluidRow(column(width = 12, shinyWidgets::addSpinner(plotOutput("plot5"))))
+
 
 observeEvent(input$runTrain, {
   
@@ -509,14 +544,13 @@ observeEvent(input$runTrain, {
     )
   
   withProgress(
-    message = "Getting signatures",
-    detail = sprintf("%s trainers", nrow(react$train.table)),
+    message = "Leggo le firme spettrali", 
     value = 0,
     min = 0,
     max = nrow(react$train.table),
     {
       for (i in 1:nrow(react$train.table)) {
-        setProgress(as.integer(i))
+        setProgress(as.integer(i), detail=sprintf("Punto %s", i))
         ss[i,] <-
           as.numeric(
             gdalUtils::gdallocationinfo(
@@ -593,15 +627,20 @@ observeEvent(input$runTrain, {
   #  train.data2<-train.data[, c("Class", as.character(cols))]
   
   names(train.data) <- c("Class", names(myImage))
-  localH2o <- h2o.init(nthreads = 10, max_mem_size = "50G")
+  localH2o <- h2o.init(nthreads = -1, max_mem_size = "50G")
   #### Import data to H2O cluster
   train <-  as.h2o(train.data)
-  
-  withProgress(message = "Intelligence going Artificial",
-               detail = "Converting image to matrix cube",
+  myImage.df<-NULL
+  withProgress(message = "Elaborazione con Algoritmi di Intelligenza Artificiale",
+               detail = "Converto immagine a matrice n2D...",
                value = 0,
                {
-                 grid <-  as.h2o(as.data.frame(myImage))
+                 myImage.df<-as.data.frame(myImage)
+                 
+                 setProgress(value = 0.1 ,
+                             detail = "Converto matrice a oggetto h2o...")
+                 
+                 grid <-  as.h2o(myImage.df)
                  #grid<- as.h2o(grid.data)
                  
                  #### Split data into train, validation and test dataset
@@ -616,8 +655,8 @@ observeEvent(input$runTrain, {
                  x <- setdiff(names(train.data), y)
                  models <- list()
                  setProgress(value = 0.21 ,
-                             detail = sprintf("Defining model with '%s'.", model.names[["RF"]]))
-                 
+                             detail = sprintf("Creo modello di classificazione con metodo '%s'.", model.names[["RF"]]))
+
                  models[["RF"]] <- h2o.randomForest(
                    x = x,
                    y = y,
@@ -627,9 +666,9 @@ observeEvent(input$runTrain, {
                    binomial_double_trees = TRUE,
                    training_frame = train
                  )
-                 
+
                  setProgress(value = 0.24 ,
-                             detail = sprintf("Defining model with '%s'.", model.names[["NB"]]))
+                             detail = sprintf("Creo modello di classificazione con metodo '%s'.", model.names[["NB"]]))
                  models[["NB"]]  <- h2o.naiveBayes(
                    x = x,
                    y = y,
@@ -638,9 +677,9 @@ observeEvent(input$runTrain, {
                    nfolds = 3,
                    seed = 1234
                  )
-                 
+
                  setProgress(value = 0.26 ,
-                             detail = sprintf("Defining model with '%s'.", model.names[["GMB"]]))
+                             detail = sprintf("Creo modello di classificazione con metodo '%s'.", model.names[["GMB"]]))
                  models[["GMB"]]  <- h2o.gbm(
                    x = x,
                    y = y,
@@ -653,9 +692,9 @@ observeEvent(input$runTrain, {
                    keep_cross_validation_predictions = TRUE,
                    seed = 1
                  )
-                 ### Deep Learning Model
+                 ## Deep Learning Model
                  setProgress(value = 0.28 ,
-                             detail = sprintf("Defining model with '%s'.", model.names[["DL"]]))
+                             detail = sprintf("Creo modello di classificazione con metodo '%s'.", model.names[["DL"]]))
                  models[["DL"]]  <- h2o.deeplearning(
                    model_id = "Deep_Learning",
                    # Destination id for this model
@@ -697,13 +736,13 @@ observeEvent(input$runTrain, {
                    reproducible = TRUE,
                    variable_importances = T
                  )
-                 
+
                  
                  rasters <- list()
                  for (i in names(models)) {
                    setProgress(
-                     value = 0.5 + length(rasters) / 10 ,
-                     detail = sprintf("Predicting with %s", model.names[[i]])
+                     value = 0.3 + length(rasters) / 100 ,
+                     detail = sprintf("Applico classificazione con modello %s", model.names[[i]])
                    )
                    g.predict = as.data.frame(h2o.predict(object = models[[i]], newdata = grid))
                    rasters[[i]] <-  raster(myImage)
@@ -711,20 +750,71 @@ observeEvent(input$runTrain, {
                      factor(g.predict$predict, levels = levels(train.data$Class))
                  }
                  
-                 setProgress(value = 0.99, detail = "Stacking results")
+                 setProgress(value = 0.4, detail = "Creo grafico...")
                  rb <- raster::brick(rasters)
                  
                  
+  
+  
+                models.rminer<-list()
+                rasters.rminer<-list()
+                  
+  
+                # setProgress(value = 0.42, message = "Utilizzo libreria RMINER...", detail=".....")
+  
+         
+                 setProgress(value = 0.48 ,
+                             detail = sprintf("Creo modello di classificazione con metodo %s.", model.names[[ "SVM" ]] ) )
+ 
+                models.rminer[["SVM"]] <- rminer::fit(Class~.,data=train.data, task="class",  model="ksvm", feature="s") 
+                
+     
+                setProgress(value = 0.5 ,
+                             detail = sprintf("Applico classificazione con metodo '%s'.", model.names[[ "SVM" ]] ))
+                         
+             
+    
+                 rasters.rminer[[ model.names[[ "SVM" ]]  ]] <- predict(myImage,  models.rminer[["SVM"]] )
+ 
+                 
+                models.rminer[["RF"]] <- rminer::fit(Class~.,data=train.data, task="class",  model="randomForest") 
+                
+                
+                 print("6")
+ setProgress(value = 0.6 ,
+                             detail = sprintf("Applico classificazione con metodo '%s'.", model.names[[ "RF" ]] ))
+                rasters.rminer[[ model.names[[ "RF" ]]  ]] <-  raster::predict(myImage,  models.rminer[["RF"]] )
+                
+                
+                 print("7")
+                models.rminer[["KNN"]] <- rminer::fit(Class~.,data=train.data, task="class",  model="knn") 
+                                
+ setProgress(value = 0.7 ,
+                             detail = sprintf("Applico classificazione con metodo '%s'.", model.names[[ "KNN" ]] ))
+                rasters.rminer[[ model.names[[ "KNN" ]]    ]] <- raster::predict(  myImage, models.rminer[["KNN"]] )
+
+
+                 print("8")
+                 setProgress(value = 0.89, detail = "Creo grafico...")
+                 
+
+                 
                })
   
+                 print("9")
+                    rb.rminer <- raster::brick(rasters.rminer)
+                  output$plot5 <- renderPlot({  levelplot(rb.rminer,  xlab = "X", ylab = "Y", main="Modelli da libreria rminer")  })
   
-  lu <- levelplot(rb,  xlab = "X", ylab = "Y")
-  
-  output$plot4 <- renderPlot({
-    lu
-  })
-  
+                 print("99")
+                    lu <- levelplot(rb,  xlab = "X", ylab = "Y")
+                  
+                  output$plot4 <- renderPlot({  lu  })
+                  
+                 
 })
+
+
+
 ```
 
 &nbsp;
