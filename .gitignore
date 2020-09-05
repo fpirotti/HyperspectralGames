@@ -2,3 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+df.with.ss.rds
+train.table.rds
+vnir.small.tif

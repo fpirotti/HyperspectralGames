@@ -31,6 +31,10 @@ shinyjs::useShinyjs(html = TRUE)
 .irs-bar-edge, .irs-bar {
   display:none;
 }
+
+.btn, .dropdown-toggle, .btn-default{
+  padding:2px;
+}
 ```
 <!-- ## Shiny Presentation -->
 
@@ -62,97 +66,119 @@ shinyjs::useShinyjs(html = TRUE)
 }
 
 .img-zoom-lens {
+  pointer-events: none;
   position: absolute;
-  border: 0px solid #d4d4d4;
-  /*set the size of the lens:*/
-  width: 40px;
-  height: 40px;
+  border: 2px solid #d4d4d4; 
+  width: 30px;
+  height: 30px;
 }
 
 div.main-container{
   max-width:9000px !important;  
 }
-
+#plot1 {
+ position: relative;
+}
 .img-zoom-result {
-  border: 2px solid #d4d4d4;
-  /*set the size of the result div:*/
-  width: 220px;
-  height: 220px;
+  position:absolute;
+  background-repeat:space;
+  border: 2px solid rgb(255, 0 ,0); 
+  width: 160px;
+  height: 160px;
+  z-index:99999; 
+  visibility:hidden;
 }
 
+.img-zoom-result-inner {   
+  border: 2px solid rgb(255, 0 ,0); 
+  width: 10px;
+  height: 10px;
+  margin:75px auto;
+  z-index:99999;
+}
 ```
 
 
-
- ```{js}
+```{js}
  var initialized = false;
- 
+ var  lens, lens2, result, cx, cy;
+  
  $('#plot1').on('DOMSubtreeModified', 'img', function(){
   imageZoom( this, "myresult" );
-});
-
- $('#plot2').on('DOMSubtreeModified', 'img', function(){
-  imageZoom( this, "myresult2" );
-});
+  });
 
  function imageZoom(img, resultID) {
- 
-  var  lens, result, cx, cy;
-  // img = document.getElementById(imgID).children[0];
-  result = document.getElementById(resultID);
   
-  /*create lens:*/
-  lens = document.createElement("DIV");
-  lens.setAttribute("class", "img-zoom-lens");
+    // img = document.getElementById(imgID).children[0];
+    result = document.getElementById(resultID); 
+    /*create lens:*/
+    if(typeof(lens)==='undefined') {
+      lens = document.createElement("DIV");
+    }
+    lens.setAttribute("class", "img-zoom-lens"); 
+    img.parentElement.insertBefore(lens, img);
+     
+      /*execute a function when someone moves the cursor over the image, or the lens:*/
+   // lens.addEventListener("mousemove", moveLens);
+    img.addEventListener("mousemove", moveLens);
+  //  lens.addEventListener("mouseenter", enterImg );
+     img.addEventListener("mouseenter", enterImg);
+   // lens.addEventListener("mouseout", exitImg );
+     img.addEventListener("mouseout", exitImg);
+     
+    /*and also for touch screens:*/
+   // lens.addEventListener("touchmove", moveLens);
+    img.addEventListener("touchmove", moveLens);
+    /*calculate the ratio between result DIV and lens:*/
+    cx = result.offsetWidth / lens.offsetWidth;
+    cy = result.offsetHeight / lens.offsetHeight;
+   
+    /*set background properties for the result DIV:*/
+    $(result).css({ 'background-color':'white', 'background-image' : 'url(' + img.src + ')'  });
+    //result.style.backgroundImage = "url('" + img.src + "')";
+//    result.style.background = "white";
+    result.style.backgroundSize = (img.width * cx) + "px " + (img.height * cy) + "px";
+  
+    function enterImg(e) { result.style.visibility="visible";  lens.style.display="block"; }
+    function exitImg(e) { result.style.visibility="hidden";    lens.style.display="none"; }
+    
+    function moveLens(e) {
+    
+      var pos, x, y;
+      /*prevent any other actions that may occur when moving over the image:*/
+      e.preventDefault();
+      /*get the cursor's x and y positions:*/
+      pos = getCursorPos(e);
+      /*calculate the position of the lens:*/
+      x = pos.x - (lens.offsetWidth / 2);
+      y = pos.y - (lens.offsetHeight / 2);
+   
  
-  /*insert lens:*/
-  img.parentElement.insertBefore(lens, img);
-  /*calculate the ratio between result DIV and lens:*/
-  cx = result.offsetWidth / lens.offsetWidth;
-  cy = result.offsetHeight / lens.offsetHeight;
-  /*set background properties for the result DIV:*/
-  result.style.backgroundImage = "url('" + img.src + "')";
-  result.style.backgroundSize = (img.width * cx) + "px " + (img.height * cy) + "px";
-  /*execute a function when someone moves the cursor over the image, or the lens:*/
-  lens.addEventListener("mousemove", moveLens);
-  img.addEventListener("mousemove", moveLens);
-  /*and also for touch screens:*/
-  lens.addEventListener("touchmove", moveLens);
-  img.addEventListener("touchmove", moveLens);
-
-  function moveLens(e) {
-    var pos, x, y;
-    /*prevent any other actions that may occur when moving over the image:*/
-    e.preventDefault();
-    /*get the cursor's x and y positions:*/
-    pos = getCursorPos(e);
-    /*calculate the position of the lens:*/
-    x = pos.x - (lens.offsetWidth / 2);
-    y = pos.y - (lens.offsetHeight / 2);
-    /*prevent the lens from being positioned outside the image:*/
-    if (x > img.width - lens.offsetWidth) {x = img.width - lens.offsetWidth;}
-    if (x < 0) {x = 0;}
-    if (y > img.height - lens.offsetHeight) {y = img.height - lens.offsetHeight;}
-    if (y < 0) {y = 0;}
-    /*set the position of the lens:*/
-    lens.style.left = x + "px";
-    lens.style.top = y + "px";
-    /*display what the lens "sees":*/
-    result.style.backgroundPosition = "-" + (x * cx) + "px -" + (y * cy) + "px";
-  }
-  function getCursorPos(e) {
-    var a, x = 0, y = 0;
-    e = e || window.event;
-    /*get the x and y positions of the image:*/
-    a = img.getBoundingClientRect();
-    /*calculate the cursor's x and y coordinates, relative to the image:*/
-    x = e.pageX - a.left;
-    y = e.pageY - a.top;
-    /*consider any page scrolling:*/
-    x = x - window.pageXOffset;
-    y = y - window.pageYOffset;
-    return {x : x, y : y};
-  }
+      lens.style.left = x + "px";
+      lens.style.top = y + "px";
+      
+      result.style.left = (x + lens.offsetWidth) + "px";
+      result.style.top = y + "px";
+      
+      /*display what the lens "sees":*/
+      result.style.backgroundPosition =   (-1*x * cx) + "px " + (-1*y * cy) + "px";
+    }
+    
+    function getCursorPos(e) {
+      var a, x = 0, y = 0;
+      e = e || window.event;
+      /*get the x and y positions of the image:*/
+      a = img.getBoundingClientRect();
+      /*calculate the cursor's x and y coordinates, relative to the image:*/
+      x = e.pageX - a.left;
+      y = e.pageY - a.top;
+      /*consider any page scrolling:*/
+      x = x - window.pageXOffset;
+      y = y - window.pageYOffset;
+      return {x : x, y : y};
+    }
+      
+  
 }
  
  
@@ -183,26 +209,66 @@ useShinyjs(rmd = TRUE)
 
 ```{r message=FALSE }
 
+lang="ITA"
+Sentinel.classification = list(
+"ff0004"= list("ENG"="Saturated or defective",  
+               "ITA"="Saturo o difettoso" ),
+"868686"= list("ENG"="Dark Area Pixels", 
+               "ITA"="Area nera"),
+"774b0a"= list("ENG"="Cloud Shadows", 
+               "ITA"="Ombra nuvole"),
+"10d22c"= list("ENG"="Vegetation", 
+               "ITA"="Vegetazione"),
+"ffff52"= list("ENG"="Bare Soils", 
+               "ITA"="Suolo nudo"),
+"0000ff"= list("ENG"="Water", 
+               "ITA"="Acqua"),
+"818181"= list("ENG"="Clouds Low Probability / Unclassified", 
+               "ITA"="Nuvole (bassa prob.) / non classificato"),
+"c0c0c0"= list("ENG"="Clouds Medium Probability", 
+               "ITA"="Nuvole (media prob.)"),
+"f1f1f1"= list("ENG"="Clouds High Probability", 
+               "ITA"="Nuvole (alta prob.)"),
+"bac5eb"= list("ENG"="Cirrus", 
+               "ITA"="Cirrus"),
+"52fff9"= list("ENG"="Snow / Ice", 
+               "ITA"="Neve/ghiaccio")
+)
 myImages<-list()
 
-img.file<-"test/T32TQR_20180424_small.tif" 
+img.file<-"test/T32TQR_20180424_spectral.tif" 
+class.file<-"test/T32TQR_20180424_Class.tif" 
 # vnir.file2<-"/archivio/home/pirotti/Google Drive/RAD_3451-1_VNIR_1800_SN00852_22000us_2020-02-11T144756_raw_rad2.tif" 
   
 myImage<-raster::brick(img.file, values=TRUE) 
- 
-# myImages[['VNIR2']]<-raster::brick(vnir.file2)
-# 
-bands<-c( "490nm", "560nm", "665nm", "705nm", "740nm", "783nm", "842nm", "865nm", "1610nm", "2190nm" )  
-names(myImage)<- bands
-  
- 
 
+myImage.class<-    raster::raster(class.file) 
+uv<-  unique(myImage.class[])
+r <- data.frame(ID=uv, 
+                name=sapply(Sentinel.classification[uv], function(x){ x[[lang]] }) )
+levels(myImage.class)[[1]]<-r
+ 
+myTheme <- rasterTheme(region = sprintf("#%s", toupper(names(Sentinel.classification)[uv]) ) )
+
+bands.alias<-c("B1",  "B2", "B3", "B4","B5", "B6","B7", "B8","B8A", "B9", "B11", "B12")
+bands.wavelengths.char<-c("442nm", "490nm", "560nm", "665nm", "705nm", "740nm", "783nm", "842nm", "864nm", "945nm", "1610nm", "2190nm" ) 
+bands.resolution<-c("60m",  "10m", "10m", "10m","20m", "20m","20m", "10m","20m","60m",  "20m", "20m")
+names(myImage)<- bands.alias
+  
 ### here we extract wavelengths from the band names
 bands.wavelengths.nm<-readr::parse_number(names(myImage)) 
 
 ### here we put them in a string with a suffix with the sensor name, we will use this later to populate sliders for choosing the band combinations to plot and RGB image.
-names(bands)<-  sprintf( "%s - %s (%s)", c(  "B2", "B3", "B4","B5", "B6","B7", "B8","B8A","B11", "B12"), bands, c(  "10m", "10m", "10m","20m", "20m","20m", "10m","20m","20m", "20m") )
+bands.picker<-bands.alias
 
+bands.picker.content <-  sprintf( "%s-%s (%s)", bands.alias, bands.wavelengths.char, bands.resolution )
+#names(bands.picker.content) <-   bands.wavelengths.char
+names(bands.picker)<-  bands.picker.content #sprintf( "%s - %s (%s)", bands.alias, bands.wavelengths.char, bands.resolution )
+
+bands.picker<-list("Visibile"=bands.picker[1:4], 
+                   "NIR/Red Edge"=bands.picker[5:9],
+                   "Cirrus"=bands.picker[10],
+                   "SWIR"=bands.picker[11:12] )
 
 ``` 
 
@@ -231,70 +297,104 @@ All'inizio di ogni sezione viene proposto un esercizio che potete eseguire con l
 
 
 
-## Firme spettrali
+## Visualizzazione e Firme spettrali
 
-**Esercizio:** raccogliete 4 firme spettrali, di elementi diversi, e.g. il canale, urbanizzato, vegetazione e la zona industriale.
-
-
-
-### Doppio click per singola firma spettrale - singolo click per aggiungerla
+- Scegli dal menù a tendina quali bande assegnare ai 3 canali di colore dell schermo (RGB) - e.g. 
+- Usa il puntatore sull'immagine per aggiungere una firma spettrale di un determinato pixel.
 
 ```{r }
-
-   choicesOpt <- list(
-      style = sprintf("background-color:%s88;", c( "#0000ff", "#00ff00,", "#ff0000", "#a50026", "#a50026",
-                                                   "#0000ff", "#00ff00,", "#ff0000", "#a50026", "#a50026" ) ) )
+ 
 
 fluidRow(  
   
-  column( 4, style="margin:0; margin-bottom:10px; width:680px !important;",    imageOutput("plot1", width = 672, height= 474,
-    dblclick = "plot_dblclick", click = "plot_click" )  ),
-  column(2, style="margin:0; width:220px !important; margin-bottom:10px;",
-       div(
-         shiny::actionButton("resetGraph", "Cancella Firme Spettrali"),
+  column( 6, style="margin:0; margin-bottom:10px; margin-left:5px; padding:0; width:680px !important;",  
+         div(  
+           style="margin:0; display:flex; gap: 5px;   width:680px !important;", 
+           shinyWidgets::pickerInput("colorChoose", "Precaricati", width = 200,  
+                             choices = list( 
+                                            "Colori Naturali (B4, B3, B2)"="B4, B3, B2", 
+                                            "Colori NIR (B8, B4, B3)"="B8, B4, B3", 
+                                            "SW IR (B12, B8A, B4)"="B12, B8A, B4", 
+                                            "Geologia (B12, B11, B2)"="B12, B11, B2", 
+                                            "Batimetria (B4, B3, B1)"="B4, B3, B1", 
+                                            "Agricoltura (B11, B8, B2)"="B11, B8, B2"  ) ),
            shinyWidgets::pickerInput(
               "bandR",
               label = "Rosso",
-              width = 220,
-              choices = bands,
-              selected = bands[[3]],
-              choicesOpt = choicesOpt
+              width = 140,
+              choices = bands.picker,
+              selected = bands.picker[[1]][[4]] 
             ),
-           
            shinyWidgets::pickerInput(
               "bandG",
               label = "Verde",
-              width = 220,
-              choices = bands ,
-              selected = bands[[2]]
+              width = 140,
+              choices = bands.picker ,
+              selected = bands.picker[[1]][[3]] 
             ),
            shinyWidgets::pickerInput(
               "bandB",
               label = "Blue",
-              width = 220,
-              choices = bands ,
-              selected = bands[[1]]
+              width = 140,
+              choices = bands.picker ,
+              selected = bands.picker[[1]][[2]] 
             )
        ),
-         div( id="myresult",   class="img-zoom-result", 
-              div(style="border:2px solid red; width:10px; height:10px; margin:105px auto;  ") )
+      
+      div( 
+           style="position:relative;", 
+           div( id="myresult",   class="img-zoom-result", div(class="img-zoom-result-inner")  ),  
+           imageOutput("plot1", width = ncol(myImage), height= nrow(myImage),  dblclick = "plot_dblclick", click = "plot_click" ) 
+      )
     ),
   
   
   
-  column( 4,  style="margin:0; width:220px !important; margin-bottom:10px;",  plotlyOutput("graph1", width=500) )
+  column( 6,    style="margin:0;  !important; margin-bottom:10px;",     tabsetPanel(
+        tabPanel("Firme Spettrali", 
+         shiny::actionButton("resetGraph", "Cancella Firme Spettrali"),
+         plotlyOutput("graph1" ) ),
+        tabPanel("Indici",  
+                 fluidRow( column(4, shiny::textInput("indexIn", "Formula") ),
+                           column(4, shinyWidgets::pickerInput("indexChoose", "Precaricati", 
+                                                     choices = list("", 
+                                                                    "Colori Naturali (B4, B3, B2)"="", 
+                                                                    "Color Infrared (B8, B4, B3)"="", 
+                                                                    "Short-Wave Infrared (B12, B8A, B4)"="", 
+                                                                    "Geology (B12, B11, B2)"="", 
+                                                                    "Bathymetric (B4, B3, B1)"="", 
+                                                                    "Agriculture (B11, B8, B2)"=""  ) ) ),
+                           column(4, shinyWidgets::actionBttn("indexGo", "Calcola", style = "minimal", size = "sm" ) ) 
+                           ),
+           imageOutput("indexPlot", width = 672, height= 474) 
+                 ), 
+        tabPanel("Classificazione",  div()   ), 
+        tabPanel("Accuratezza", div() )
+      )   )
   
 )
+
+
+shiny::observeEvent(input$colorChoose, {
+  bands<-strsplit(input$colorChoose, ",")[[1]] 
+  bb<-c("bandR", "bandG", "bandB")
+  names(bb)<-bands
+  isolate({
+    for(i in bands){
+       updatePickerInput(session = session,  inputId =  trimws(bb[[i]]), selected = trimws(i)  )
+    }
+  })
+}, ignoreInit = T  )
 
 output$plot1 <- renderPlot({
   
   req(input$bandR, input$bandG, input$bandB)
-   
+  
   plotRGB(
     myImage,
-    r = isolate({ which(input$bandR == bands) }),
-    g = isolate({ which(input$bandG == bands) }),
-    b = isolate({ which(input$bandB == bands) }), 
+    r = isolate({ which(input$bandR == bands.alias) }),
+    g = isolate({ which(input$bandG == bands.alias) }),
+    b = isolate({ which(input$bandB == bands.alias) }), 
     stretch = "hist",
     main ="Clicca per firma spettrale pixel - doppio click per aggiungere"
   )
@@ -318,6 +418,7 @@ observeEvent(input$plot_click, {
   plotlyProxyInvoke(plotlyProxy("graph1", session), "addTraces", list(
     list(
       x = bands.wavelengths.nm,
+      name = sprintf("(%d, %d)", x.click, y.click),
       y = values.num / 10000,
       type = 'scatter',
       mode = 'markers+lines',  line = list(shape = "spline")
@@ -334,9 +435,10 @@ output$graph1 <- renderPlotly({
   input$resetGraph
   
   p <- plot_ly(type = "scatter", mode = "markers") %>% layout( 
+    showlegend = T,
     xaxis = list(title = "Lunghezza d'Onda (nm)"),
     yaxis = list(title = "Riflettanza Bottom-Of-Atmosphere (BOA)"),
-    title = sprintf("Firme spettrale")
+    title = sprintf("Firme spettrali")
    ) # %>% add_trace(
   #     y = values.num / 10000,
   #     x =  bands.wavelengths.nm,
@@ -353,6 +455,14 @@ model.names <- list(RF = "Random Forest",
                     SVM= "Support Vector Machine",
                     DL = "Deep Learning")
 ```
+
+**Esercizio 1:** Seleziona due combinazione di bande da assegnare ai canali dello schermo tali da: 
+  1. visualizzare a colori reali l'immagine.
+  2. visualizzare il NIR - near infrared
+  3. un'altra combinazione a scelta
+
+**Esercizio 2:** raccogliete 4 firme spettrali, di elementi diversi, e.g. il canale, urbanizzato, vegetazione e la zona industriale.
+
 
 ## Classificazione "supervisionata"
 
@@ -405,9 +515,9 @@ fluidRow(
     div(style="display:inline-block;float:left",
       title = "Removes all points!!",
       shinyWidgets::actionBttn("resetTrain", label = "RESET", size = "xs",block = F, style = "fill",   shiny::icon("trash"))
-    ),
-    div(style="display:inline-block;float:left;",  shinyWidgets::actionBttn("runTrain",  label = "Elabora",  size = "xs", block = F, style = "fill",  shiny::icon("gear")) ),
-    div( id="myresult2",   class="img-zoom-result", div(style="border:2px solid red; width:10px; height:10px; margin:105px auto;  ") ) 
+    ) #,
+    # div(style="display:inline-block;float:left;",  shinyWidgets::actionBttn("runTrain",  label = "Elabora",  size = "xs", block = F, style = "fill",  shiny::icon("gear")) ),
+    # div( id="myresult2",   class="img-zoom-result", div(style="border:2px solid red; width:10px; height:10px; margin:105px auto;  ") ) 
   ),
   
   column(
