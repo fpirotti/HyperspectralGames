@@ -3,20 +3,23 @@ title: "Analizzare Immagini Digitali: dalla Visualizzazione all'Intelligenza Art
 author: "Francesco Pirotti - CIRGEO / TESAF  - Università di Padova"
 date: "27/8/2020" 
 output:
-  html_notebook: 
+  html_notebook:
     toc: yes
-  html_document:
+ # html_document:
  # ioslides_presentation: 
     highlight: tango 
-    toc_float:
-      
-      collapsed: no
-      smooth_scroll: no
+    # toc_float:
+    #   
+    #   collapsed: no
+    #   smooth_scroll: no    
+    includes:
+      in_header: cssloaders_in_header.html
 runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message=FALSE )
+library(tidyverse)
 ```
 
 ```{r, echo=FALSE}
@@ -47,8 +50,9 @@ shinyjs::useShinyjs(html = TRUE)
   z-index:99999; 
   position:absolute;   
   width:100px; height:100px; 
-  border:2px solid red;
+  border:2px solid yellow;
   pointer-events: none;
+  visibility:hidden;
 }
 
 * {box-sizing: border-box;}
@@ -248,6 +252,7 @@ $( document ).ready(function() {
 ```{r message=FALSE }
 
 library(shinyWidgets)
+library(shinycssloaders)
 library(raster)
 library(rgdal) 
 library(ggplot2) 
@@ -314,6 +319,11 @@ Sentinel.classification = list(
 )
 
 translations<-list(
+  "docGV" = list("ENG"="<b>Click on the Sentinel-2 image on your left</b>  for positioning a NxN pixel window (N = the custom value set with slider on the left). A tile plot showing all pixels inside the window for each band will be drawn, with grey-level values (a.k.a. DN - Digital Number).", "ITA"="<b>Clicca sull'immagine a sinistra</b>  per identificare una finestra di NxN pixel (N = dimensione impostata qui dalla barra qui a sinistra). Verrà disegnato un grafico interattivo per ogni banda, con i valori di grigio (DN Digital Number) dei pixel della finestra."),
+  "docSpectral" = list("ENG"="<b>Clicks on left image will plot spectral signatures. Bands of Sentinel 2 are plotted - hover with mouse over bottom squares for description of bands</b>",
+                       "ITA"="<b>I click del mouse disegnano la forma spettrale. Le fasce rappresentano le bande di sensibilità del Sentinel 2 - posiziona il mouse sopra il quadrato nero in basso per una descrizione della banda</b>"),
+  "docIndex" = list("ENG"="<b>Choose index</b> from drop-down list or define one yourself then click the green button - you can also download the result with the right-most button.",
+                    "ITA"="<b>Scegli un indice</b> dalla lista o definisci un indice; disegnalo con il pulsante verde - scarica il risultato con il pulsante."),
   "precaricati"=list("ENG"="Predefined", "ITA"="Precaricati"),
   "r"=list("ENG"="Red", "ITA"="Rosso"),
   "g"=list("ENG"="Green", "ITA"="Verde"),
@@ -502,14 +512,15 @@ fluidRow(
         class = "img-zoom-result",
         div(class = "img-zoom-result-inner")
       ),
-      div(id="finestraGV"  ),
-      imageOutput(
+      
+     div(id="finestraGV"),
+     shinycssloaders::withSpinner(  imageOutput(
         "plot1",
         width = ncol(myImage),
         height = nrow(myImage), 
         hover = "plot_hover",
         click = "plot_click"
-      )
+      ),  hide.ui = F )
     )
   ),
   
@@ -524,49 +535,40 @@ fluidRow(
         "Valori di grigio",
         value = "GV.panel",
         fluidRow(
-        #   column(
-        #   2, style="margin-top:24px;",
-        #   shinyWidgets::actionBttn(
-        #     inputId = "calcGraphGV",
-        #     label = translations$calcola[[lang]] ,
-        #     icon =  icon("gear"),
-        #     color = "success",
-        #     style = "fill",
-        #     size = "sm"
-        #   )
-        # ),
-          column(6, title="Dimensioni della finestra che verrà ritagliata intorno al punto selezionato",
-               sliderInput("dimGV", "Dimensione finestra", min=5, step=2, max=25, value=11)
+          column(4, title="Dimensioni della finestra che verrà ritagliata intorno al punto selezionato",  sliderInput("dimGV", "Dimensione finestra", min=5, step=2, max=25, value=11)
                ),
-          column(7,  
-               div(style="text-align:justify;", "<b>Clicca</b> sull'immagine a sinistra per prendere una piccola finestra di NxN pixel (dove N = dimensione finestra impostata a sinistra) e disegnare X grafici interattivi con i valori di grigio - dove X=numero di bande dell'immagine")
+          column(8,  
+               div(style="text-align:justify;", HTML(translations$docGV[[lang]]) )
            )
         ),
 
-        plotlyOutput("graphGVtiles" , height = 1000) #,
+       shinycssloaders::withSpinner( plotlyOutput("graphGVtiles" , height = 1000), type = 1, hide.ui = F ) #,
        # plotlyOutput("graphGV" , height = 500)
       ),
       tabPanel(
         "Firme Spettrali",
         value = "firme.panel",
-        shinyWidgets::actionBttn(
+        div(
+          shinyWidgets::actionBttn(
           inputId = "resetGraph",
           label = translations$firme.spettrali.cancella[[lang]] ,
           icon =  icon("trash"),
           color = "danger",
           style = "fill",
           size = "sm"
-        ),
+        ) , translations$docSpectral[[lang]]  ),
         plotlyOutput("graph1" , height = 500)
       ),
       tabPanel(
         "Indici",
         value = "indici.panel",
-        fluidRow(
-          column(5,  style = "margin:0;margin-top:5px;",    shiny::textInput("indexIn", "Formula")),
+        
+        div( HTML(translations$docIndex[[lang]] ) ), 
+        fluidRow( 
           column(
-            7,
+            12,
             style = "margin:0; display:flex; gap:5px; margin-top:5px;",
+            shiny::textInput("indexIn", "Formula"),
             shinyWidgets::pickerInput(
               "indexChoose",
               width = 200,
@@ -601,14 +603,18 @@ fluidRow(
               title = "Scarica un geotiff",
               shiny::downloadButton("indexDownload",
                                     label = NULL)
-            )
+            ),
+            div(id="indexValue")
           )
         ),
-        shinyWidgets::addSpinner(imageOutput(
-          "indexPlot",
-          width = ncol(myImage) + 80,
-          height = nrow(myImage) + 40
-        ))
+        shinycssloaders::withSpinner(
+          imageOutput(
+           "indexPlot",
+            width = ncol(myImage) ,
+            height = nrow(myImage),
+            hover = "plotIndex_hover"
+          ),  hide.ui = F
+        )
       ),
       tabPanel("Training POI",   value = "classificazione.panel",
                
@@ -681,6 +687,8 @@ fluidRow(
   
 )
 
+
+
 ### zoom LENTI
 shiny::observeEvent(input$zoomLens, {
   req(input$zoomLens)
@@ -724,7 +732,7 @@ shiny::observeEvent(input$indexGo, {
   req(input$indexIn, input$indexGo)
   eq <- gsub("B([1-9A]{1,2})", "myImage[['B\\1']]", input$indexIn)
   
-  out.raster <- tryCatch( eval(parse(text = eq)), 
+  out.raster <<- tryCatch( eval(parse(text = eq)), 
                         error = function(e) { e })  
 
   if( is.element("error", class(out.raster)) ){
@@ -732,15 +740,41 @@ shiny::observeEvent(input$indexGo, {
     return(NULL)
   }
    
+  
+  output$indexPlot <- renderPlot( plot(1:12)   )
+  
+  output$graphGVtiles <- renderPlot( plot(1:12)   )
+  
   output$indexPlot <-
     renderPlot({
-      rasterVis::levelplot(
+
+    par(ann = FALSE,
+        bg = "black",
+        bty = "n",
+        mai = c(0,0,0,0),
+        mgp = c(0, 0, 0),
+        oma = c(0,0,0,0),
+        omd = c(0,1,0,1),
+        omi = c(0,0,0,0),
+        mar = c(0,0,0,0),
+  #  usr = c(-180, 180, -90, 90),
+  #  pin = c(4,2),
+        plt = c(0,1,0,1),
+  #  pty = "m",
+  #  xaxs = 'i',
+  #  xaxt = 'n',
+        xpd = FALSE,
+  #  yaxs = 'i',
+        yaxt = 'n')
+      
+      image(
         out.raster,
-        par.settings = RdBuTheme,
-        margin = F,
-        xlab = NULL,
-        ylab = NULL,
-        scales = list(draw = FALSE)
+#        par.settings = RdBuTheme,
+        box=FALSE,
+        border=NA,
+        ann=FALSE,
+        axes = FALSE,
+        legend=T
       )
     })
   
@@ -767,6 +801,16 @@ shiny::observeEvent(input$colorChoose, {
     }
   })
 }, ignoreInit = T)
+
+
+renderPlot({
+    if(exists("values$data")) {
+      dat <- values$data 
+    } else {
+      dat <- 0
+    }
+    hist(dat)
+})
 
 output$plot1 <- renderPlot({
   req(input$bandR, input$bandG, input$bandB)
@@ -799,9 +843,34 @@ output$coordinate<-renderText({
     
   })
 
-observeEvent(input$plot_click, {
+observeEvent(input$plotIndex_hover, {
   
-  req(input$plot_click)
+  vv<-raster::cellFromXY(
+      myImage ,
+      c(input$plotIndex_hover$x, input$plotIndex_hover$y)
+    )
+  
+  va<-round( out.raster[vv], 3) 
+  
+  runjs(sprintf( "Value: $('#indexValue').html('%s')", va  ) )
+
+})
+
+
+
+
+observeEvent(input$pannelli, {
+  
+ runjs( sprintf("  $(\"#finestraGV\").css({ 'visibility':'%s' }); ",
+                ifelse(input$pannelli=="GV.panel", "visible","hidden") ) )
+ 
+  
+})
+
+observeEvent({ input$plot_click
+  input$dimGV } , {
+  
+  req(input$plot_click, input$dimGV)
   
  if( input$pannelli=="GV.panel" ){ 
     # if( as.integer(input$zoomLens)==0 ){
@@ -816,7 +885,7 @@ observeEvent(input$plot_click, {
  col1<-raster::colFromX(myImage, input$plot_click$x) - offset
  row1<-raster::rowFromY(myImage, input$plot_click$y) - offset
  
- runjs( sprintf("  $(\"#finestraGV\").css({ 'top':'%spx', 'left':'%spx', 'width':'%spx', 'height':'%spx'  }); ",  row1-2, col1-2, size+4, size+4 ) )
+ runjs( sprintf("  $(\"#finestraGV\").css({ 'visibility':'visible', 'top':'%spx', 'left':'%spx', 'width':'%spx', 'height':'%spx'  }); ",  row1-4, col1-4, size+5, size+5 ) )
  
  
  if(col1 < 0){ col1 <- 0 }
@@ -836,12 +905,12 @@ observeEvent(input$plot_click, {
  b <- lapply(rast, function(x){ matrix(x, nrow=size, ncol=size, byrow=TRUE) })
  
  rast.m<-reshape2::melt(b)
- names(rast.m)<-c("x","y", "value","Band")
+ names(rast.m)<-c("x","y", "Rifl","Band")
  rast.m$Band<- factor(rast.m$Band, levels=bands.alias )
  
  output$graphGVtiles <- renderPlotly({ 
-   ggplot(rast.m, aes(x=size-y,y=x))  + 
-    geom_raster(aes(fill=value)) +
+   ggplot(rast.m, aes(x=y,y=size-x))  + 
+    geom_raster(aes(fill=Rifl)) +
     facet_wrap(vars(Band), ncol = 3) +
     theme_bw() +
      coord_fixed(expand=F) +
@@ -875,7 +944,7 @@ observeEvent(input$plot_click, {
   
 
   
-})
+}, ignoreInit = T )
 
 output$graph1 <- renderPlotly({
  
