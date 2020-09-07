@@ -4,7 +4,7 @@ author: "Francesco Pirotti - CIRGEO / TESAF  - Università di Padova"
 date: "27/8/2020" 
 output:
   html_notebook: 
-    toc_float: yes
+    toc: yes
   html_document:
  # ioslides_presentation: 
     highlight: tango 
@@ -39,14 +39,28 @@ shinyjs::useShinyjs(html = TRUE)
     padding: 4px;
 }
 
+#finestraGV {
+  -webkit-box-shadow: 0px 0px 13px 2px rgba(0,0,0,0.75);
+  -moz-box-shadow: 0px 0px 13px 2px rgba(0,0,0,0.75);
+  box-shadow: 0px 0px 13px 2px rgba(0,0,0,0.75);  
+  display:block; 
+  z-index:99999; 
+  position:absolute;   
+  width:100px; height:100px; 
+  border:2px solid red;
+  pointer-events: none;
+}
+
 * {box-sizing: border-box;}
 
 .shiny-notification {
               height: 200px;
-              width: 800px;
+              width: 600px;
               position:fixed;
-              top: calc(50% - 50px);;
-              left: calc(50% - 400px);;
+              top: calc(50% - 50px);
+              left: calc(50% - 400px);
+              opacity: 0.95;
+              font-weight:bold;
             }
 .img-zoom-container {
   position: relative;
@@ -82,6 +96,14 @@ div.main-container{
   margin:75px auto;
   z-index:99999;
 }
+
+.highlightStyle {
+  background:#ffff0038;
+  position:absolute;
+  margin:-10px; 
+  border:3px solid #ff3300; 
+  z-index:99999999999;
+}
 ```
 
 
@@ -90,18 +112,26 @@ div.main-container{
  var  lens, lens2, result, cx, cy, lenszoom, img;
  lenszoom=0;
   
+function requestFullScreen(element) {
+    // Supports most browsers and their versions.
+    var requestMethod = element.requestFullScreen || element.webkitRequestFullScreen || element.mozRequestFullScreen || element.msRequestFullScreen;
+
+    if (requestMethod) { // Native full screen.
+        requestMethod.call(element);
+    } else if (typeof window.ActiveXObject !== "undefined") { // Older IE.
+        var wscript = new ActiveXObject("WScript.Shell");
+        if (wscript !== null) {
+            wscript.SendKeys("{F11}");
+        }
+    }
+}
+
+var elem = document.body; // Make the body go full screen.
+requestFullScreen(elem);
+  
 $( document ).ready(function() {
+ $("#pannelli").children().css({ 'font-weight':'bold', 'font-size':'16px' })
  
-//  $( "div[ data-value='firme.panel']" ).css({ 'padding':'3px', 'background':'rgba(200,0,0,0.1)'  });
-//    $( "a[ data-value='firme.panel']" ).parent().css({ 'background':'rgba(200,0,0,0.1)' });
-//  
-//  
-//  $( "div[ data-value='classificazione.panel']" ).css({ 'padding':'3px', 'background':'rgba(200,200,0,0.1)'  // });
-//    $( "a[ data-value='classificazione.panel']" ).parent().css({ 'background':'rgba(200,200,0,0.1)' });
-//    
-//  $( "div[ data-value='indici.panel']" ).css({ 'padding':'3px', 'background':'rgba(200,0,200,0.1)'  });
-//    $( "a[ data-value='indici.panel']" ).parent().css({ 'background':'rgba(200,0,200,0.1)' });
-   
 });
 
   
@@ -110,6 +140,20 @@ $( document ).ready(function() {
   imageZoom( this, "myresult", true );
   });
 
+  
+  function highlightWidget(wg, time=10000){ 
+  
+      tt = document.createElement("DIV");
+      tt.setAttribute("class", "highlightStyle");  
+      tt.style.width= (wg[0].offsetWidth+20)+"px";
+      tt.style.height= (wg[0].offsetHeight+20)+"px"; 
+      wg.before(tt);
+ 
+      $(tt).on("mouseenter", function(){ $(tt).fadeOut(1000)  } ); 
+   // wg.addClass("highlightStyle");
+      setTimeout(function(){ $(tt).fadeOut(2000) }, time); 
+      setTimeout(function(){  $(tt).remove() }, time+2000); 
+  }
   
     function enterImg(e) { result.style.visibility="visible";  lens.style.visibility="visible";  }
     function exitImg(e) { result.style.visibility="hidden";    lens.style.visibility="hidden"; }
@@ -218,6 +262,7 @@ library(dygraphs)
 library(h2o) ## A.I. library
 useShinyjs(rmd = TRUE)
  
+#saveRDS(s2.bands, "s2.bands.rds")
 s2.bands<-readRDS("s2.bands.rds")
 band.colors<-c("#680085", "#0036ff", "#09ff00", "#ed0000", "#e70000", "#e70000", 
                "#e70000", "#e70000", "#a20000", "#a20000","#a20000", "#500000", "#500000")
@@ -228,7 +273,7 @@ rectangles<-apply(s2.bands, 1, function(x){
     type = "rect",
     fillcolor = band.colors[[ as.integer(x[[1]]) ]],
     line = list(color = band.colors[[ as.integer(x[[1]]) ]] ),
-    opacity = 0.4,
+    opacity = 0.2,
     x0 =  as.integer(x[['min.wl']]),
     x1 =  as.integer(x[['max.wl']]),
     xref = "x",
@@ -273,6 +318,9 @@ translations<-list(
   "r"=list("ENG"="Red", "ITA"="Rosso"),
   "g"=list("ENG"="Green", "ITA"="Verde"),
   "b"=list("ENG"="Blue", "ITA"="Blu"),
+  "cancella"=list("ENG"="Remove", "ITA"="Cancella"),
+  "calcola"=list("ENG"="Process", "ITA"="Elabora"),
+  "ricalcola"=list("ENG"="ReProcess", "ITA"="RiElabora"),
   "firme.spettrali"=list("ENG"="Spectral Signatures", "ITA"="Firme Spettrali"),
   "firme.spettrali.cancella"=list("ENG"="Remove Signatures", "ITA"="Cancella Firme"),
   "firme.spettrali.x"=list("ENG"="Wavelength (nm)", "ITA"="Lunghezza d'onda (nm)"),
@@ -323,6 +371,7 @@ bands.picker<-list("Visibile"=bands.picker[1:4],
                    "SWIR"=bands.picker[11:12] )
 
 ``` 
+<p>SI CONSIGLIA DI VISUALIZZARE LA PAGINA INGRANDENDO </p>
 
 ## Note introduttive
 
@@ -344,7 +393,7 @@ Ogni sezione consente di interagire con l'immagine per analizzarne alcuni aspett
 - Le operazioni di **analisi dell'accuratezza stimata** mediante [matrici di confusione](https://it.wikipedia.org/wiki/Matrice_di_confusione){target=_blank} e la creazione di **indici di accuratezza** per classe e totali (indice [__Kappa__](https://it.wikipedia.org/wiki/Kappa_di_Cohen){target=_blank}, [__ROC__](https://it.wikipedia.org/wiki/Receiver_operating_characteristic){target=_blank}, [__precisione/recupero__](https://it.wikipedia.org/wiki/Precisione_e_recupero){target=_blank}, [__falsi positivi__](https://it.wikipedia.org/wiki/Falso_positivo){target=_blank},  [__falsi negativi__](https://it.wikipedia.org/wiki/Falso_negativo){target=_blank}, [__F1-score__](https://it.wikipedia.org/wiki/F1_score){target=_blank}, etc...)
 
 
-All'inizio di ogni sezione viene proposto un esercizio che potete eseguire con l'interfaccia.
+Vengono proposti esercizi nelle varie sezioni che potete eseguire con l'interfaccia.
 
 
 
@@ -354,6 +403,8 @@ All'inizio di ogni sezione viene proposto un esercizio che potete eseguire con l
 - Scegli dal menù a tendina quali bande assegnare ai 3 canali di colore dell schermo (RGB) - e.g. 
 - **Singolo click** - usa il puntatore sull'immagine per aggiungere una firma spettrale di un determinato pixel.
 - **Doppio click** - usa il puntatore sull'immagine cliccando duo volte per aggiungere un POI .
+
+<hr>
 
 ```{r }
  
@@ -369,9 +420,9 @@ img.file.sigs<-img.file
 raster::extension(img.file.sigs)<-"rds"
 
 if (file.exists(img.file.sigs)) {
-  react$train.table <-
+   tt<-
     readRDS(img.file.sigs)
-  
+  react$train.table<-tt[ sort(tt$id, decreasing=T), ]
   #saveRDS(img.file.sigs, img.file.sigs)
 
 }
@@ -382,7 +433,7 @@ fluidRow(
     6,
     style = "margin:0; margin-bottom:10px; margin-left:5px; padding:0; width:620px !important;",
     
-    div(style = "margin:0; display:flex; gap: 5px;   width:680px !important;", ),
+    #div(style = "margin:0; display:flex; gap: 5px;   width:680px !important;" ),
     ## https://www.indexdatabase.de/db/s-single.php?id=96
     div(
       style = "margin:0; display:flex; gap: 5px;   width:680px !important;",
@@ -451,11 +502,11 @@ fluidRow(
         class = "img-zoom-result",
         div(class = "img-zoom-result-inner")
       ),
+      div(id="finestraGV"  ),
       imageOutput(
         "plot1",
         width = ncol(myImage),
-        height = nrow(myImage),
-        dblclick = "plot_dblclick",
+        height = nrow(myImage), 
         hover = "plot_hover",
         click = "plot_click"
       )
@@ -466,9 +517,35 @@ fluidRow(
   
   column(
     6,
-    style = "margin:0;  !important;  min-width:650px !important; margin-bottom:10px;",
+    style = "margin:0;  !important;  min-width:650px !important; width:calc(100vw - 650px); margin-bottom:10px;",
     tabsetPanel(
       id = "pannelli",
+      tabPanel(
+        "Valori di grigio",
+        value = "GV.panel",
+        fluidRow(
+        #   column(
+        #   2, style="margin-top:24px;",
+        #   shinyWidgets::actionBttn(
+        #     inputId = "calcGraphGV",
+        #     label = translations$calcola[[lang]] ,
+        #     icon =  icon("gear"),
+        #     color = "success",
+        #     style = "fill",
+        #     size = "sm"
+        #   )
+        # ),
+          column(6, title="Dimensioni della finestra che verrà ritagliata intorno al punto selezionato",
+               sliderInput("dimGV", "Dimensione finestra", min=5, step=2, max=25, value=11)
+               ),
+          column(7,  
+               div(style="text-align:justify;", "<b>Clicca</b> sull'immagine a sinistra per prendere una piccola finestra di NxN pixel (dove N = dimensione finestra impostata a sinistra) e disegnare X grafici interattivi con i valori di grigio - dove X=numero di bande dell'immagine")
+           )
+        ),
+
+        plotlyOutput("graphGVtiles" , height = 1000) #,
+       # plotlyOutput("graphGV" , height = 500)
+      ),
       tabPanel(
         "Firme Spettrali",
         value = "firme.panel",
@@ -533,7 +610,7 @@ fluidRow(
           height = nrow(myImage) + 40
         ))
       ),
-      tabPanel("Classificazione",   value = "classificazione.panel",
+      tabPanel("Training POI",   value = "classificazione.panel",
                
                fluidRow(
                  column(
@@ -559,9 +636,10 @@ fluidRow(
                    ),
                    
                    div( 
+                     title = "Disegna i POI sulla mappa a sinistra",
                      shinyWidgets::actionBttn(
                        "plotTrain",
-                       label = "RiDisegna",
+                       label = "Disegna",
                        size = "sm",
                        block = F,
                        style = "fill",
@@ -569,6 +647,7 @@ fluidRow(
                      )
                    ),
                    div( 
+                     title = "Salva i POI (verranno ricaricati se ricarichi la pagina)",
                      shinyWidgets::actionBttn(
                        "saveTrain",
                        label = "Salva",
@@ -579,7 +658,7 @@ fluidRow(
                      )
                    ),
                    div( 
-                     title = "Removes all points!!",
+                     title = "Rimuovi tutti i POI",
                      shinyWidgets::actionBttn(
                        "resetTrain",
                        label = "RESET",
@@ -637,6 +716,9 @@ output$indexDownload <- downloadHandler(
     }
   )
 
+
+
+
 #### CALCOLA INDICE ###############
 shiny::observeEvent(input$indexGo, {
   req(input$indexIn, input$indexGo)
@@ -649,6 +731,7 @@ shiny::observeEvent(input$indexGo, {
     runjs(sprintf("alert(\"%s\");", translations$index.fomula.wrong[[lang]] ) )
     return(NULL)
   }
+   
   output$indexPlot <-
     renderPlot({
       rasterVis::levelplot(
@@ -719,29 +802,78 @@ output$coordinate<-renderText({
 observeEvent(input$plot_click, {
   
   req(input$plot_click)
-  values <- gdalUtils::gdallocationinfo(img.file, input$plot_click$x,
-                                input$plot_click$y, geoloc=T, valonly = T)
- 
-  values.num <- as.numeric(values) 
   
-  x.click <- as.integer(input$plot_click$x)
-  y.click <- as.integer(input$plot_click$y)
-
-  if( input$pannelli!="firme.panel" ){
-     updateTabsetPanel(session, "pannelli",
-      selected = "firme.panel") 
-  }
-      
-  plotlyProxyInvoke(plotlyProxy("graph1", session), "addTraces", list(
+ if( input$pannelli=="GV.panel" ){ 
+    # if( as.integer(input$zoomLens)==0 ){
+    #   runjs("highlightWidget( $(\"#zoomLens\"));")
+    #   showNotification("Seleziona una dimensione della lente per visualizzare una finestra sul puntatore mentre ci si muove sull'immagine a sinistra dal quale prendere i valori di grigio")
+    #   return(NULL)
+    # }
+ 
+ size<- input$dimGV
+ offset <- ((size-1)/2)
+ 
+ col1<-raster::colFromX(myImage, input$plot_click$x) - offset
+ row1<-raster::rowFromY(myImage, input$plot_click$y) - offset
+ 
+ runjs( sprintf("  $(\"#finestraGV\").css({ 'top':'%spx', 'left':'%spx', 'width':'%spx', 'height':'%spx'  }); ",  row1-2, col1-2, size+4, size+4 ) )
+ 
+ 
+ if(col1 < 0){ col1 <- 0 }
+ if(row1 < 0){ row1 <- 0 }
+ 
+ if(col1 > (ncol(myImage)-1) ){ col1 <- ncol(myImage)-1-size }
+ if(row1 > (nrow(myImage)-1) ){ row1 <- nrow(myImage)-1-size }
+ 
+ 
+ rast <- as.data.frame( 
+            getValuesBlock(myImage, 
+                row=row1, nrows=size, 
+                col=col1, ncols=size, format="m")
+          )
+ 
+ rast <- rast / 10000
+ b <- lapply(rast, function(x){ matrix(x, nrow=size, ncol=size, byrow=TRUE) })
+ 
+ rast.m<-reshape2::melt(b)
+ names(rast.m)<-c("x","y", "value","Band")
+ rast.m$Band<- factor(rast.m$Band, levels=bands.alias )
+ 
+ output$graphGVtiles <- renderPlotly({ 
+   ggplot(rast.m, aes(x=size-y,y=x))  + 
+    geom_raster(aes(fill=value)) +
+    facet_wrap(vars(Band), ncol = 3) +
+    theme_bw() +
+     coord_fixed(expand=F) +
+    scale_fill_distiller(palette = "Greys")
+    })
+ 
+ }
+  
+ if( input$pannelli=="firme.panel" ){ 
+   
+    values <- gdalUtils::gdallocationinfo(img.file, input$plot_click$x,
+                              input$plot_click$y, geoloc=T, valonly = T)
+    
+    values.num <- as.numeric(values) 
+    
+    x.click <- as.integer(input$plot_click$x)
+    y.click <- as.integer(input$plot_click$y)
+    
+    plotlyProxyInvoke(plotlyProxy("graph1", session), "addTraces", list(
     list(
-      x = as.integer(bands.wavelengths.nm),
-      name = sprintf("(%d, %d)", x.click, y.click),
-      y = values.num / 10000,
-      type = 'scatter',
-      mode = 'markers+lines',  line = list(shape = "spline")
+    x = as.integer(bands.wavelengths.nm),
+    name = sprintf("(%d, %d)", x.click, y.click),
+    y = values.num / 10000,
+    type = 'scatter',
+    mode = 'markers+lines',  line = list(shape = "spline")
     )
     
-  ))
+    ))
+  
+  }
+  
+
   
 })
 
@@ -769,8 +901,9 @@ output$graph1 <- renderPlotly({
          '%{text}'
        ),
        text = sprintf(
-         "<b>Larghezza banda nello spettro:</b> %s nm<br><b>Risoluzione spaziale pixel:</b> %s m<br><b>Descrizione:</b><br>%s",
+         "<b>Larghezza banda nello spettro:</b> %s nm<br><b>Nome banda:</b><font>%s</font><br><b>Risoluzione spaziale pixel:</b> %s m<br><b>Descrizione:</b><br>%s",
          s2.bands$size.wl,
+         s2.bands$name,
          s2.bands$size.pixel,
          lapply(s2.bands$desc.ita, function(x) {
            paste0(collapse = "<br>", stringi::stri_wrap(x, 30, 0.0))
@@ -819,9 +952,9 @@ observeEvent(input$saveTrain, {
   
   img.file.sigs<-img.file
   raster::extension(img.file.sigs)<-"rds"
-  if(file.exists(img.file.sigs)) runjs("alert('Attenzione, ho sovrascritto il file');")
+  if(file.exists(img.file.sigs)) runjs("alert('Attenzione, sovrascrivo il file se esistente');")
   saveRDS(isolate(react$train.table), img.file.sigs)
-  
+  shinyWidgets::alert("asdfasd")
 })
 
 output$plot2 <- renderPlot({
@@ -866,14 +999,26 @@ output$plot2 <- renderPlot({
 })
 
 
-output$trainingTable <- DT::renderDataTable( react$train.table, 
-                                             extensions = 'Scroller',
-                                             options = list(pageLength = 1000, 
-                                                            deferRender = TRUE,
-                                                            scrollY = 200,
-                                                            scroller = TRUE,  
-                                                            dom = 'ft'),  
-                                             server = FALSE, rownames = FALSE )
+
+output$trainingTable <- DT::renderDataTable({
+ 
+  req(react$train.table)
+  
+  DT::datatable(
+    react$train.table,
+    rownames = FALSE,
+    extensions = 'Scroller',
+    options = list(
+      class = "display nowrap compact",
+      pageLength = 1000, 
+      scrollY = 200,
+      scroller = TRUE,
+    server = FALSE,
+      dom = 'ft'
+    )
+  )
+  
+})
 
 observeEvent(input$resetTrain,  {
   isolate({
@@ -893,13 +1038,13 @@ observeEvent(input$plot_dblclick,  {
   isolate({
     react$train.table <-
       rbind(
-        react$train.table,
         list(
           id = as.integer(nrow(react$train.table) + 1),
           x = as.integer(input$plot_dblclick$x),
           y = as.integer(input$plot_dblclick$y),
           Class = input$myClass
-        )
+        ),
+        react$train.table
       )
   })
 })

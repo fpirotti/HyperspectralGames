@@ -1,0 +1,14 @@
+id	min.wl	mid.wl	max.wl	size.wl	size.pixel	desc.eng	desc.ita
+1	433	443	453	20	60	Atmospheric correction (aerosol scattering)	Correzione atmosferica (dispersione di aerosol)
+2	458	490	522	65	10	Sensitive to vegetation senescing, carotenoid, browning, and soil background; atmospheric correction (aerosol scattering)	Sensibile alla senescenza della vegetazione, ai carotenoidi, all'imbrunimento e allo sfondo del suolo; correzione atmosferica (dispersione di aerosol)
+3	543	560	577	35	10	Green peak; sensitive to total chlorophyll in vegetation	Picco verde; sensibile alla clorofilla totale nella vegetazione
+4	650	665	680	30	10	Maximum chlorophyll absorption	Massimo assorbimento di clorofilla
+5	698	705	712	15	20	Position of red edge; consolidation of atmospheric corrections – fluorescence baseline	Posizione del bordo rosso; consolidamento delle correzioni atmosferiche - linea di base della fluorescenza
+6	733	740	747	15	20	Position of red edge, atmospheric correction; retrieval of aerosol load	Posizione del bordo rosso, correzione atmosferica; recupero del carico aerosol
+7	773	783	793	20	20	LAI, edge of the NIR plateau	LAI, bordo dell'altopiano NIR
+8	785	842	899	115	10	LAI	LAI
+9	855	865	875	20	20	NIR plateau; sensitive to total chlorophyll, biomass, LAI, and protein; water vapor absorption reference; retrieval of aerosol load and type	Altopiano NIR; sensibile alla clorofilla totale, biomassa, LAI e proteine; riferimento all'assorbimento del vapore acqueo; recupero del carico e del tipo di aerosol
+10	935	945	955	20	60	Water vapor absorption; atmospheric correction	Assorbimento del vapore acqueo; correzione atmosferica
+11	1360	1375	1390	30	60	Detection of thin cirrus for atmospheric correction	Rilevazione di cirri sottili per correzione atmosferica
+12	1565	1610	1655	90	20	Sensitive to lignin, starch, and forest aboveground biomass; snow–ice–cloud separation	Sensibile a lignina, amido e biomassa forestale fuori terra; separazione neve-ghiaccio-nuvola
+13	2100	2190	2280	180	20	Assessment of Mediterranean vegetation conditions; distinction between live biomass, dead biomass, and soil (e.g., for burn scars mapping)	Valutazione delle condizioni della vegetazione mediterranea;  distinzione dei terreni argillosi per il monitoraggio dell'erosione del suolo; distinzione tra biomassa viva, biomassa morta e suolo (ad esempio, per la mappatura delle cicatrici da ustione)

@@ -38,6 +38,20 @@ plotRGB( flip( raster::stack(myImages.SWIR[[220]], myImages.SWIR[[100]], myImage
         stretch = "hist")
  
 
+myImage.class<-    raster::raster(class.file) 
+uv<-  unique(myImage.class[])
+r <- data.frame(ID=sort(uv), 
+                name=sapply(Sentinel.classification[sort(uv)], function(x){ x[[lang]] }) )
+
+levels(myImage.class)[[1]]<-r
+
+#dev.set(dev.next())
+#Sys.setenv("DISPLAY"=":1.0")
+myTheme <- rasterTheme(region = sprintf("#%s", toupper(names(Sentinel.classification)[sort(uv)]) ) )
+rasterVis::levelplot(myImage.class, par.settings = myTheme)
+
+
+
 col <- RColorBrewer::brewer.pal(6, "Paired")
 col2 <- RColorBrewer::brewer.pal(6, "Pastel2")
 train.table.classes <- as.factor(train.table$Class)
