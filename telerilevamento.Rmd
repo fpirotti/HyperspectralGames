@@ -7,16 +7,18 @@ output:
     toc: yes
  # html_document:
  # ioslides_presentation: 
-    highlight: tango 
+    highlight: tango  
     # toc_float:
     #   
-    #   collapsed: no
+    #   collapsed: no <script   nomdule   src="js.cookie.min.js"></script>
     #   smooth_scroll: no    
-    includes:
-      in_header: cssloaders_in_header.html
+    includes: 
+      in_header: 
+        - cssloaders_in_header.html
 runtime: shiny
 ---
 
+  
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message=FALSE )
 library(tidyverse)
@@ -28,7 +30,6 @@ shiny::addResourcePath("shinyjs", system.file("srcjs", package = "shinyjs"))
 ```{r, context="server"}
 shinyjs::useShinyjs(html = TRUE)
 ```
-
 
 ```{css, echo=FALSE}
 .irs-bar-edge, .irs-bar {
@@ -77,10 +78,22 @@ shinyjs::useShinyjs(html = TRUE)
   z-index:99999; 
 }
 
+.myCanvasTrain{
+  width:5px;
+  height:5px;
+  border:solid 2px red;
+  z-index:999;
+  position:absolute;
+  pointer-events: none;
+  -webkit-box-shadow: 0px 0px 0px 2px rgba(255,255,255,0.95);
+  -moz-box-shadow: 0px 0px 0px 2px rgba(255,255,255,0.95);
+  box-shadow: 0px 0px 0px 2px rgba(255,255,255,0.95);  
+}
+
 div.main-container{
   max-width:9000px !important;  
 }
-#plot1 {
+#myImageDOMplot {
  position: relative;
 }
 .img-zoom-result {
@@ -113,34 +126,25 @@ div.main-container{
 
 ```{js}
  var initialized = false;
- var  lens, lens2, result, cx, cy, lenszoom, img;
+ var  lens, lens2, result, cx, cy, lenszoom,  myCanvas, img;
  lenszoom=0;
   
-function requestFullScreen(element) {
-    // Supports most browsers and their versions.
-    var requestMethod = element.requestFullScreen || element.webkitRequestFullScreen || element.mozRequestFullScreen || element.msRequestFullScreen;
+ 
 
-    if (requestMethod) { // Native full screen.
-        requestMethod.call(element);
-    } else if (typeof window.ActiveXObject !== "undefined") { // Older IE.
-        var wscript = new ActiveXObject("WScript.Shell");
-        if (wscript !== null) {
-            wscript.SendKeys("{F11}");
-        }
-    }
-}
-
-var elem = document.body; // Make the body go full screen.
-requestFullScreen(elem);
   
 $( document ).ready(function() {
+
+ checkCookie("email", "Email or username (will only be used to save preferences and inputs)");
+
  $("#pannelli").children().css({ 'font-weight':'bold', 'font-size':'16px' })
- 
+    
+
+
 });
 
   
   
- $('#plot1').on('DOMSubtreeModified', 'img', function(){
+ $('#myImageDOMplot').on('DOMSubtreeModified', 'img', function(){
   imageZoom( this, "myresult", true );
   });
 
@@ -251,6 +255,10 @@ $( document ).ready(function() {
 
 ```{r message=FALSE }
 
+# htmltools::tagList(
+#   htmltools::tags$script(src = "./libs/js.cookie.min.js")
+# )
+
 library(shinyWidgets)
 library(shinycssloaders)
 library(raster)
@@ -267,6 +275,8 @@ library(dygraphs)
 library(h2o) ## A.I. library
 useShinyjs(rmd = TRUE)
  
+loaded<-F
+out.raster<-NULL
 #saveRDS(s2.bands, "s2.bands.rds")
 s2.bands<-readRDS("s2.bands.rds")
 band.colors<-c("#680085", "#0036ff", "#09ff00", "#ed0000", "#e70000", "#e70000", 
@@ -319,9 +329,15 @@ Sentinel.classification = list(
 )
 
 translations<-list(
-  "docGV" = list("ENG"="<b>Click on the Sentinel-2 image on your left</b>  for positioning a NxN pixel window (N = the custom value set with slider on the left). A tile plot showing all pixels inside the window for each band will be drawn, with grey-level values (a.k.a. DN - Digital Number).", "ITA"="<b>Clicca sull'immagine a sinistra</b>  per identificare una finestra di NxN pixel (N = dimensione impostata qui dalla barra qui a sinistra). Verrà disegnato un grafico interattivo per ogni banda, con i valori di grigio (DN Digital Number) dei pixel della finestra."),
+  "docGV" = list("ENG"="<b>Click on the Sentinel-2 image on your left</b>  for positioning a NxN pixel window (N = the custom value set with slider on the left). A tile plot showing all pixels inside the window for each band will be drawn, with grey-level values (a.k.a. DN - Digital Number). Hovering with the mouse over the plots will provide reflectance values of each pixel. Notice the size difference between pixels in bands with different spatial resolution.", "ITA"="<b>Clicca sull'immagine a sinistra</b>  per identificare una finestra di NxN pixel (N = dimensione impostata qui dalla barra qui a sinistra). Verrà disegnato un grafico interattivo per ogni banda, con i valori di grigio (DN Digital Number) dei pixel della finestra. Spostandosi sul grafico con il puntatore, appariranno i valori di riflettanza del singolo pixel. Notare la differenza di dimensione dei pixel tra bande con diverse risoluzioni."),
   "docSpectral" = list("ENG"="<b>Clicks on left image will plot spectral signatures. Bands of Sentinel 2 are plotted - hover with mouse over bottom squares for description of bands</b>",
-                       "ITA"="<b>I click del mouse disegnano la forma spettrale. Le fasce rappresentano le bande di sensibilità del Sentinel 2 - posiziona il mouse sopra il quadrato nero in basso per una descrizione della banda</b>"),
+                       "ITA"="<b>Clicca sull'immagine a sinistra</b> per ottenere la firma spettrale. Le fasce rappresentano le bande di sensibilità del Sentinel 2 - posiziona il mouse sopra il quadrato nero in basso nel grafico per una descrizione della banda.</b>"),
+  
+  "docSpectral_q" = list("ENG"="<b>Clicks on left image will plot spectral signatures. Bands of Sentinel 2 are plotted - hover with mouse over bottom squares for description of bands</b>",
+                       "ITA"="<p>Non è presente una delle bande Sentinel-2 - quale e perchè?</p><p>Non è presente una delle bande Sentinel-2 - quale e perchè?</p>"),
+  "docSpectral_a" = list("ENG"="<b>Clicks on left image will plot spectral signatures. Bands of Sentinel 2 are plotted - hover with mouse over bottom squares for description of bands</b>",
+                       "ITA"="<p>Non è presente al B10 in quanto viene utilizzata per la correzione atmosferica e l'immagine che avete è corretta atmosfericamente</p><p></p>"),
+  
   "docIndex" = list("ENG"="<b>Choose index</b> from drop-down list or define one yourself then click the green button - you can also download the result with the right-most button.",
                     "ITA"="<b>Scegli un indice</b> dalla lista o definisci un indice; disegnalo con il pulsante verde - scarica il risultato con il pulsante."),
   "precaricati"=list("ENG"="Predefined", "ITA"="Precaricati"),
@@ -381,21 +397,31 @@ bands.picker<-list("Visibile"=bands.picker[1:4],
                    "SWIR"=bands.picker[11:12] )
 
 ``` 
-<p>SI CONSIGLIA DI VISUALIZZARE LA PAGINA INGRANDENDO </p>
+
+<B style=" color:red;" >SI CONSIGLIA DI VISUALIZZARE LA PAGINA A PIENO SCHERMO (tasto F11)</B>
 
 ## Note introduttive
 
 **Il codice in R di questo esercizio è disponibile in GitHub [QUI](https://github.com/fpirotti/HyperspectralGames){target=_blank}**
 
-Nelle sezioni seguenti vedrete un ritaglio di un'immagine  Sentinel-2 L2A ripresa sopra la città di Padova il giorno 24 aprile 2018 (noterete facilmente in alto a destra Prato della Valle). Sono riportate solo le [bande a 10 m e 20 m del sensore Sentinel 2](https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_S2_SR#bands){target=_blank}.
+Nelle sezioni seguenti vedrete un ritaglio di un'immagine  Sentinel-2 ripresa sopra la città di Padova il giorno 24 aprile 2018 (noterete facilmente in alto a destra Prato della Valle). Sono caricate le [bande corrette atmosfericamente a BOA (Bottom of Atmosphere)](https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_S2_SR#bands){target=_blank}.
 
-Ogni sezione consente di interagire con l'immagine per analizzarne alcuni aspetti:
 
-- La visualizzazione a schermo assegnando combinazioni di [**bande**](https://it.wikipedia.org/wiki/Spettro_elettromagnetico#Suddivisione_in_bande){target=_blank} dello [**spettro elettromagnetico**](https://it.wikipedia.org/wiki/Spettro_elettromagnetico){target=_blank} ai tre canali. 
-- La [**firma spettrale**](https://it.wikipedia.org/wiki/Firma_spettrale){target=_blank} su un punto selezionato
-- L'applicazione di operazioni tra bande per creare degli **indicatori** (e.g. [NDVI](https://it.wikipedia.org/wiki/Normalized_Difference_Vegetation_Index){target=_blank}) che aiutano l'interpretazione di alcuni fenomeni. 
-- Le operazioni per la **classificazione supervisionata** (i.e. con il supporto dell'operatore):
-  - La definizione di punti sull'immagine per l'addestramento del modello  (punti definiti anche **ROI/POI** - regions/points of interest, regioni/punti di interesse)
+Il pannello a sinistra contiene l'immagine consentendo:
+
+- assegnare combinazioni di [**bande**](https://it.wikipedia.org/wiki/Spettro_elettromagnetico#Suddivisione_in_bande){target=_blank} dello [**spettro elettromagnetico**](https://it.wikipedia.org/wiki/Spettro_elettromagnetico){target=_blank} ai tre canali dello schermo. 
+- ingrandire a vari livelli una zona per identificare meglio gli elementi
+- cliccando un punto verranno analizzati alcuni aspetti nel pannello a destra.
+
+Il pannello a destra dell'immagine contiene sezioni che consentono:
+
+- **Valori di Grigio**: ingrandire una finestra per vedere i singoli valori dei pixel per ogni banda.
+- **Firme Spettrali**: calcolare la [**firma spettrale**](https://it.wikipedia.org/wiki/Firma_spettrale){target=_blank} su un punto selezionato nell'immagine
+- **Indici**:  l'applicazione di operazioni tra bande per creare degli **indicatori** (e.g. [NDVI](https://it.wikipedia.org/wiki/Normalized_Difference_Vegetation_Index){target=_blank}) che aiutano l'interpretazione di alcuni fenomeni. 
+- **Training POI**: la definizione di punti sull'immagine per l'addestramento del modello  (punti definiti anche **ROI/POI** - regions/points of interest, regioni/punti di interesse)
+  
+La sezione successiva consente operazioni per la **classificazione supervisionata** (i.e. con il supporto dei punti POI definiti dall'operatore al punto precedente):
+
   - La creazione di **modelli predittivi** usanto i dati di addestramento/training con:
     - metodi classici ( __Maximum Likelyhood__, __Spectral Angle Mapper__, __Minimum Distance__)
     - metodi di A.I. - __machine learning__  (Random Forest, Support Vector Machine)
@@ -408,13 +434,8 @@ Vengono proposti esercizi nelle varie sezioni che potete eseguire con l'interfac
 
 
 
-## Visualizzazione e Firme spettrali
+## ANALISI DELL'IMMAGINE
 
-- Scegli dal menù a tendina quali bande assegnare ai 3 canali di colore dell schermo (RGB) - e.g. 
-- **Singolo click** - usa il puntatore sull'immagine per aggiungere una firma spettrale di un determinato pixel.
-- **Doppio click** - usa il puntatore sull'immagine cliccando duo volte per aggiungere un POI .
-
-<hr>
 
 ```{r }
  
@@ -425,18 +446,20 @@ react <- reactiveValues(train.table = data.frame(
   Class = character(0)
 ))
 
+```
 
+```{r }
 img.file.sigs<-img.file
 raster::extension(img.file.sigs)<-"rds"
 
 if (file.exists(img.file.sigs)) {
-   tt<-
-    readRDS(img.file.sigs)
+   tt<-  readRDS(img.file.sigs)
   react$train.table<-tt[ sort(tt$id, decreasing=T), ]
-  #saveRDS(img.file.sigs, img.file.sigs)
-
 }
 
+```
+
+```{r }
 
 fluidRow(
   column(
@@ -475,7 +498,8 @@ fluidRow(
           `<i class='fa fa-search'></i> x4` = "4",
           `<i class='fa fa-search'></i> x8` = "8"
         ),
-        justified = TRUE
+        justified = TRUE,
+        selected ="4"
       ),
       verbatimTextOutput("coordinate")
     ),
@@ -513,9 +537,9 @@ fluidRow(
         div(class = "img-zoom-result-inner")
       ),
       
-     div(id="finestraGV"),
+     div(id="finestraGV"), 
      shinycssloaders::withSpinner(  imageOutput(
-        "plot1",
+        "myImageDOMplot",
         width = ncol(myImage),
         height = nrow(myImage), 
         hover = "plot_hover",
@@ -538,7 +562,7 @@ fluidRow(
           column(4, title="Dimensioni della finestra che verrà ritagliata intorno al punto selezionato",  sliderInput("dimGV", "Dimensione finestra", min=5, step=2, max=25, value=11)
                ),
           column(8,  
-               div(style="text-align:justify;", HTML(translations$docGV[[lang]]) )
+               div(style="text-align:justify; margin-top:10px;", HTML(translations$docGV[[lang]]) )
            )
         ),
 
@@ -548,7 +572,7 @@ fluidRow(
       tabPanel(
         "Firme Spettrali",
         value = "firme.panel",
-        div(
+        div( style="margin-top:10px;",
           shinyWidgets::actionBttn(
           inputId = "resetGraph",
           label = translations$firme.spettrali.cancella[[lang]] ,
@@ -556,7 +580,7 @@ fluidRow(
           color = "danger",
           style = "fill",
           size = "sm"
-        ) , translations$docSpectral[[lang]]  ),
+        ) , HTML( translations$docSpectral[[lang]] ) ),
         plotlyOutput("graph1" , height = 500)
       ),
       tabPanel(
@@ -604,7 +628,7 @@ fluidRow(
               shiny::downloadButton("indexDownload",
                                     label = NULL)
             ),
-            div(id="indexValue")
+            div(style = "  margin-top:15px;", id="indexValue")
           )
         ),
         shinycssloaders::withSpinner(
@@ -687,14 +711,12 @@ fluidRow(
   
 )
 
-
-
 ### zoom LENTI
 shiny::observeEvent(input$zoomLens, {
   req(input$zoomLens)
   shinyjs::runjs(
     sprintf(
-      "lenszoom=%s; if($('#plot1 img').length==1) imageZoom( $('#plot1 img').get(0), \"myresult\", false );  ",
+      "lenszoom=%s; if($('#myImageDOMplot img').length==1) imageZoom( $('#myImageDOMplot img').get(0), \"myresult\", false );  ",
       input$zoomLens,
       input$zoomLens
     )
@@ -709,12 +731,8 @@ output$indexDownload <- downloadHandler(
       paste(tempfile(), ".tif", sep = "")
     },
     content = function(file) {
-      eq <- gsub("B([1-9A]{1,2})", "myImage[['B\\1']]", input$indexIn)
-      
-      out.raster <- tryCatch( eval(parse(text = eq)), 
-                            error = function(e) { e })  
-    
-      if( is.element("error", class(out.raster)) ){
+
+      if( is.element("error", class(myImage)) ){
         runjs(sprintf("alert(\"%s\");", translations$index.fomula.wrong[[lang]] ) )
         return(NULL)
       }
@@ -724,7 +742,8 @@ output$indexDownload <- downloadHandler(
     }
   )
 
-
+  output$indexPlot <-
+    renderPlot({ })
 
 
 #### CALCOLA INDICE ###############
@@ -740,14 +759,11 @@ shiny::observeEvent(input$indexGo, {
     return(NULL)
   }
    
-  
-  output$indexPlot <- renderPlot( plot(1:12)   )
-  
-  output$graphGVtiles <- renderPlot( plot(1:12)   )
+   
   
   output$indexPlot <-
     renderPlot({
-
+      
     par(ann = FALSE,
         bg = "black",
         bty = "n",
@@ -756,29 +772,23 @@ shiny::observeEvent(input$indexGo, {
         oma = c(0,0,0,0),
         omd = c(0,1,0,1),
         omi = c(0,0,0,0),
-        mar = c(0,0,0,0),
-  #  usr = c(-180, 180, -90, 90),
-  #  pin = c(4,2),
-        plt = c(0,1,0,1),
-  #  pty = "m",
-  #  xaxs = 'i',
-  #  xaxt = 'n',
-        xpd = FALSE,
-  #  yaxs = 'i',
+        mar = c(0,0,0,0), 
+        plt = c(0,1,0,1), 
+        xpd = FALSE, 
         yaxt = 'n')
       
       image(
         out.raster,
 #        par.settings = RdBuTheme,
         box=FALSE,
-        border=NA,
+       # border=NA,
         ann=FALSE,
-        axes = FALSE,
-        legend=T
+        axes = FALSE#,
+      #  legend=T
       )
     })
   
-}, ignoreInit = T)
+} )
 
 shiny::observeEvent(input$indexChoose, {
   req(input$indexChoose)
@@ -803,16 +813,7 @@ shiny::observeEvent(input$colorChoose, {
 }, ignoreInit = T)
 
 
-renderPlot({
-    if(exists("values$data")) {
-      dat <- values$data 
-    } else {
-      dat <- 0
-    }
-    hist(dat)
-})
-
-output$plot1 <- renderPlot({
+output$myImageDOMplot <- renderPlot({
   req(input$bandR, input$bandG, input$bandB)
   
   plotRGB(
@@ -844,7 +845,7 @@ output$coordinate<-renderText({
   })
 
 observeEvent(input$plotIndex_hover, {
-  
+  req(input$plotIndex_hover$x)
   vv<-raster::cellFromXY(
       myImage ,
       c(input$plotIndex_hover$x, input$plotIndex_hover$y)
@@ -852,7 +853,7 @@ observeEvent(input$plotIndex_hover, {
   
   va<-round( out.raster[vv], 3) 
   
-  runjs(sprintf( "Value: $('#indexValue').html('%s')", va  ) )
+  runjs(sprintf( "$('#indexValue').html('<b>Index value at mouse</b><br>%s')", va  ) )
 
 })
 
@@ -860,17 +861,20 @@ observeEvent(input$plotIndex_hover, {
 
 
 observeEvent(input$pannelli, {
-  
- runjs( sprintf("  $(\"#finestraGV\").css({ 'visibility':'%s' }); ",
-                ifelse(input$pannelli=="GV.panel", "visible","hidden") ) )
  
+ if(loaded) runjs( sprintf("   $(\"#finestraGV\").css({ 'visibility':'%s' }); ",
+              ifelse(input$pannelli=="GV.panel", "visible","hidden") ) )
   
-})
+ if(!loaded) loaded<<-T
+ 
+}, ignoreInit = T  )
+
+
 
 observeEvent({ input$plot_click
   input$dimGV } , {
   
-  req(input$plot_click, input$dimGV)
+  req(input$dimGV)
   
  if( input$pannelli=="GV.panel" ){ 
     # if( as.integer(input$zoomLens)==0 ){
@@ -878,7 +882,11 @@ observeEvent({ input$plot_click
     #   showNotification("Seleziona una dimensione della lente per visualizzare una finestra sul puntatore mentre ci si muove sull'immagine a sinistra dal quale prendere i valori di grigio")
     #   return(NULL)
     # }
- 
+ if(!isTruthy(input$plot_click)){
+   output$graphGVtiles <- renderPlotly({  })
+   return(NULL)
+ }
+   
  size<- input$dimGV
  offset <- ((size-1)/2)
  
@@ -894,7 +902,10 @@ observeEvent({ input$plot_click
  if(col1 > (ncol(myImage)-1) ){ col1 <- ncol(myImage)-1-size }
  if(row1 > (nrow(myImage)-1) ){ row1 <- nrow(myImage)-1-size }
  
- 
+
+ output$graphGVtiles <- renderPlotly({
+   
+    
  rast <- as.data.frame( 
             getValuesBlock(myImage, 
                 row=row1, nrows=size, 
@@ -908,7 +919,7 @@ observeEvent({ input$plot_click
  names(rast.m)<-c("x","y", "Rifl","Band")
  rast.m$Band<- factor(rast.m$Band, levels=bands.alias )
  
- output$graphGVtiles <- renderPlotly({ 
+ 
    ggplot(rast.m, aes(x=y,y=size-x))  + 
     geom_raster(aes(fill=Rifl)) +
     facet_wrap(vars(Band), ncol = 3) +
@@ -1017,61 +1028,78 @@ We will use only the SWIR because it is a lighter image and takes less time to p
 
 ```{r  }
 
+
+observeEvent(input$cookie.username, { 
+  #runjs( sprintf( "alert('%s')",input$cookie.username ) )
+  })
+
+
 observeEvent(input$saveTrain, {
   
   img.file.sigs<-img.file
   raster::extension(img.file.sigs)<-"rds"
   if(file.exists(img.file.sigs)) runjs("alert('Attenzione, sovrascrivo il file se esistente');")
   saveRDS(isolate(react$train.table), img.file.sigs)
-  shinyWidgets::alert("asdfasd")
+ 
 })
 
-output$plot2 <- renderPlot({
+
+
+
+observeEvent(input$plotTrain, {
   req(input$plotTrain)
-  
-  req(input$bandR, input$bandG, input$bandB)
-   
-  plotRGB(
-    myImage,
-    r = which(input$bandR == bands),
-    g = which(input$bandG == bands),
-    b = which(input$bandB == bands),
-    scale = 255,
-    stretch = "hist"
-  )
-  
   isolate({
     if (shiny::isTruthy(react$train.table) && nrow(react$train.table)) {
-      col <- RColorBrewer::brewer.pal(6, "Paired")
-      col2 <- RColorBrewer::brewer.pal(6, "Pastel2")
+      col <- RColorBrewer::brewer.pal(9, "Paired")
+      col2 <- RColorBrewer::brewer.pal(9, "Pastel1")
       train.table.classes <- as.factor(react$train.table$Class)
-      
-      points(
-        react$train.table$x,
-        react$train.table$y,
-        col = col[train.table.classes],
-        bg = col2[train.table.classes],
-        pch = 21
-      )
-      
-      text(
-        react$train.table$x,
-        react$train.table$y,
-        pos = 2,
-        react$train.table$id,
-        col = col[train.table.classes]
-      )
-      
+
+      runjs( sprintf("draw( %s,  %s,  %s,  %s)", 
+                     jsonlite::toJSON(colFromX(myImage, react$train.table[, "x"]) ),
+                     jsonlite::toJSON(rowFromY(myImage, react$train.table[, "y"]) ),
+                     jsonlite::toJSON( react$train.table[, "id"]  ),
+                     jsonlite::toJSON(col2[train.table.classes]) ) );
+      # points(
+      #   react$train.table$x,
+      #   react$train.table$y,
+      #   col = col[train.table.classes],
+      #   bg = col2[train.table.classes],
+      #   pch = 21
+      # )
+      # 
+      # text(
+      #   react$train.table$x,
+      #   react$train.table$y,
+      #   pos = 2,
+      #   react$train.table$id,
+      #   col = col[train.table.classes]
+      # )
+
     }
   })
-  
+
 })
 
 
 
 output$trainingTable <- DT::renderDataTable({
  
-  req(react$train.table)
+  req(react$train.table, input$pannelli)
+  if(input$pannelli!="classificazione.panel"){
+    runjs("$(\".myCanvasTrain\").remove();")
+    return(NULL)
+  }
+  
+  col <- RColorBrewer::brewer.pal(9, "Paired")
+  col2 <- RColorBrewer::brewer.pal(9, "Pastel1")
+  train.table.classes <- as.factor(react$train.table$Class)
+
+  runjs( sprintf("draw( %s,  %s,  %s,  %s, '%s')", 
+                 jsonlite::toJSON(colFromX(myImage, react$train.table[, "x"]) ),
+                 jsonlite::toJSON(rowFromY(myImage, react$train.table[, "y"]) ),
+                 jsonlite::toJSON( react$train.table[, "id"]  ),
+                 jsonlite::toJSON(col2[train.table.classes])
+                 ) );
   
   DT::datatable(
     react$train.table,
