@@ -440,7 +440,6 @@ Vengono proposti esercizi nelle varie sezioni che potete eseguire con l'interfac
 ```{r }
  
 react <- reactiveValues(train.table = data.frame(
-  id = integer(0),
   East = numeric(0) ,
   North = numeric(0),
   X = integer(0) ,
@@ -644,9 +643,9 @@ fluidRow(
                      multiple = F,
                      options = list(create = TRUE)
                    ),
-                   
-                   div( 
-                     title = "Disegna i POI sulla mappa a sinistra",
+                   div( style="display:flex;gap:5px;",
+                    div( 
+                     title = "Disegna i POI sulla mappa a sinistra", 
                      shinyWidgets::actionBttn(
                        "plotTrain",
                        label = "Disegna",
@@ -655,19 +654,19 @@ fluidRow(
                        style = "fill",
                        shiny::icon("pen")
                      )
-                   ),
-                   div( 
-                     # title = "Salva i POI (verranno ricaricati se ricarichi la pagina)",
-                     # shinyWidgets::actionBttn(
-                     #   "saveTrain",
-                     #   label = "Salva",
-                     #   size = "sm",
-                     #   block = F,
-                     #   style = "fill",
-                     #   shiny::icon("save")
-                     # )
-                   ),
-                   div( 
+                    ),
+                    div( 
+                     title = "Elimina le righe selezionate",
+                     shinyWidgets::actionBttn(
+                       "delTrain",
+                       label = "Elimina",
+                       size = "sm",
+                       block = F,
+                       style = "fill",
+                       shiny::icon("remove")
+                     )
+                    ),
+                    div( 
                      title = "Rimuovi tutti i POI",
                      shinyWidgets::actionBttn(
                        "resetTrain",
@@ -677,6 +676,7 @@ fluidRow(
                        style = "fill",
                        shiny::icon("trash")
                      )
+                    )
                    )
                  ),
                  
@@ -722,19 +722,13 @@ We will use only the SWIR because it is a lighter image and takes less time to p
  tags$style(HTML('table.dataTable.hover tbody tr:hover, table.dataTable.display tbody tr:hover {background-color: pink !important; cursor:pointer;}'))
 
 
-observeEvent(input$POItableRowHover, { 
-  req(input$POItableRowHover)
-  # print(input$POItableRowHover)
-  # runjs( sprintf(" alert('%s')  ", input$POItableRowHover ) )
+observeEvent(input$POItableRowHover, {  
+  req(input$POItableRowHover, !is.na(as.integer(input$POItableRowHover[[1]])))
   isolate({
-      runjs( sprintf("enterImg(null); putLens(%d, %d)  ", react$train.table$X[[ input$POItableRowHover[[1]] ]] , react$train.table$Y[[ input$POItableRowHover[[1]] ]] ) )
- 
+      dd<-react$train.table[as.integer(input$POItableRowHover[[1]]), ]
+      runjs( sprintf("enterImg(null); putLens(%d, %d)  ", dd$X, dd$Y  ) )
   })
-  #           
- 
-
-  #runjs( sprintf( "alert('%s')",input$cookie.username ) )
-  })
+})
 
 
 observeEvent(input$cookie.username, { 
@@ -754,7 +748,7 @@ observeEvent(input$cookie.username, {
   
   if (file.exists(img.file.sigs)) {
      tt<-  readRDS(img.file.sigs)
-     react$train.table<-tt[ sort(tt$id, decreasing=T), ]
+     react$train.table<-tt
      return(NULL)
   }
   
@@ -765,7 +759,7 @@ observeEvent(input$cookie.username, {
   if (file.exists(img.file.sigs2)) {
      tt<-  readRDS(img.file.sigs2)
      saveRDS(tt, img.file.sigs)
-     react$train.table<-tt[ sort(tt$id, decreasing=T), ]
+     react$train.table<-tt
   }
 
 })
@@ -1017,8 +1011,7 @@ observeEvent({ input$plot_click; input$dimGV } , {
   row1<-raster::rowFromY(myImage, input$plot_click$y)
    
   dt<-isolate(react$train.table)
-  row<-list(
-        id = nrow(dt)+1,
+  row<-list( 
         East =  input$plot_click$x ,
         North =  input$plot_click$y,
         X = col1 ,
@@ -1026,7 +1019,7 @@ observeEvent({ input$plot_click; input$dimGV } , {
         Class = Class
       )
    
-  dt.final<- rbind( row, react$train.table  )
+  dt.final<- rbind( react$train.table, row  )
   react$train.table<-dt.final
  
   if(!is.null(img.file.sigs) ) saveRDS(dt.final, img.file.sigs)
@@ -1086,9 +1079,9 @@ observeEvent(input$plotTrain, {
       train.table.classes <- as.factor(react$train.table$Class)
 
       runjs( sprintf("draw( %s,  %s,  %s,  %s)", 
-                     jsonlite::toJSON(colFromX(myImage, react$train.table[, "x"]) ),
-                     jsonlite::toJSON(rowFromY(myImage, react$train.table[, "y"]) ),
-                     jsonlite::toJSON( react$train.table[, "id"]  ),
+                     jsonlite::toJSON(colFromX(myImage, react$train.table$X) ),
+                     jsonlite::toJSON(rowFromY(myImage, react$train.table$Y) ),
+                     jsonlite::toJSON( rownames(react$train.table)  ),
                      jsonlite::toJSON(col2[train.table.classes]) ) );
       # points(
       #   react$train.table$x,
@@ -1121,25 +1114,25 @@ output$trainingTable <- DT::renderDT({
   
   callback <- c( 
   "table.on('mouseenter', 'tr', function(){", 
-  "  var index = table.row(this).data();",
-  " if(index!=='undefined') Shiny.setInputValue('POItableRowHover', index[0], {priority: 'event'});",
+  " var index = table.row(this);", 
+  " if(index!==undefined) {  Shiny.setInputValue('POItableRowHover', index[0], {priority: 'event'}); }",
   "});"
-)
+  )
   
   col <- RColorBrewer::brewer.pal(9, "Paired")
   col2 <- RColorBrewer::brewer.pal(9, "Pastel1")
   train.table.classes <- as.factor(react$train.table$Class)
 
   runjs( sprintf("draw( %s,  %s,  %s,  %s)", 
-                 jsonlite::toJSON(colFromX(myImage, react$train.table[, "X"]) ),
-                 jsonlite::toJSON(rowFromY(myImage, react$train.table[, "Y"]) ),
-                 jsonlite::toJSON( react$train.table[, "id"]  ),
+                 jsonlite::toJSON(colFromX(myImage, react$train.table$X) ),
+                 jsonlite::toJSON(rowFromY(myImage, react$train.table$Y) ),
+                 jsonlite::toJSON( rownames(react$train.table)  ),
                  jsonlite::toJSON(col2[train.table.classes])
                  ) );
   
   datatable(
-    react$train.table,
-    rownames = FALSE,
+    react$train.table[ order( as.integer(rownames(react$train.table)), decreasing = T ), ],
+    rownames = T,
       callback = JS(callback),
     #callback = JS(callback),
     extensions = 'Scroller',
@@ -1154,11 +1147,21 @@ output$trainingTable <- DT::renderDT({
   
 })
 
+observeEvent(input$delTrain,  {
+  
+  req(input$trainingTable_rows_selected)
+  
+  isolate({
+    react$train.table <-
+     react$train.table[ -input$trainingTable_rows_selected, ]
+  })
+})
+
+
 observeEvent(input$resetTrain,  {
   isolate({
     react$train.table <-
      data.frame(
-      id = integer(0),
       East = numeric(0) ,
       North = numeric(0),
       X = integer(0) ,
