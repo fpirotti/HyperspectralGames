@@ -133,13 +133,8 @@ div.main-container{
 
   
 $( document ).ready(function() {
-
- checkCookie("email", "Email or username (will only be used to save preferences and inputs)");
-
+ checkCookie("email","Inserisci email, verrà utilizzata unicamente per memorizzare le tue impostazioni.");
  $("#pannelli").children().css({ 'font-weight':'bold', 'font-size':'16px' })
-    
-
-
 });
 
   
@@ -167,27 +162,31 @@ $( document ).ready(function() {
     function exitImg(e) { result.style.visibility="hidden";    lens.style.visibility="hidden"; }
 
     function moveLens(e) {
-    
       var pos, x, y;
       /*prevent any other actions that may occur when moving over the image:*/
       e.preventDefault();
       /*get the cursor's x and y positions:*/
       pos = getCursorPos(e);
       /*calculate the position of the lens:*/
-      x = pos.x - (lens.offsetWidth / 2);
-      y = pos.y - (lens.offsetHeight / 2);
-   
+
+      putLens(pos.x,pos.y);
  
+
+    }
+    
+    function putLens(x1,y1){
+    
+      var x = x1 - (lens.offsetWidth / 2);
+      var y = y1 - (lens.offsetHeight / 2);
+      
       lens.style.left = x + "px";
       lens.style.top = y + "px";
       
       result.style.left = (x + lens.offsetWidth) + "px";
       result.style.top = y + "px";
-      
-      /*display what the lens "sees":*/
+       
       result.style.backgroundPosition =   (-1*x * cx) + "px " + (-1*y * cy) + "px";
     }
-    
     function getCursorPos(e) {
       var a, x = 0, y = 0;
       e = e || window.event;
@@ -258,7 +257,7 @@ $( document ).ready(function() {
 # htmltools::tagList(
 #   htmltools::tags$script(src = "./libs/js.cookie.min.js")
 # )
-
+library(DT)
 library(shinyWidgets)
 library(shinycssloaders)
 library(raster)
@@ -361,6 +360,7 @@ myImages<-list( "Padova" = list(file="test/T32TQR_20180424_spectral.tif", type="
 
 
 img.file<-"test/T32TQR_20180424_spectral.tif" 
+img.file.sigs<-NULL
 class.file<-"test/T32TQR_20180424_Class.tif" 
 # vnir.file2<-"/archivio/home/pirotti/Google Drive/RAD_3451-1_VNIR_1800_SN00852_22000us_2020-02-11T144756_raw_rad2.tif" 
   
@@ -441,26 +441,17 @@ Vengono proposti esercizi nelle varie sezioni che potete eseguire con l'interfac
  
 react <- reactiveValues(train.table = data.frame(
   id = integer(0),
-  x = integer(0) ,
-  y = integer(0),
+  East = numeric(0) ,
+  North = numeric(0),
+  X = integer(0) ,
+  Y = integer(0),
   Class = character(0)
 ))
 
-```
+## check if there is user file for this image:
 
-```{r }
-img.file.sigs<-img.file
-raster::extension(img.file.sigs)<-"rds"
 
-if (file.exists(img.file.sigs)) {
-   tt<-  readRDS(img.file.sigs)
-  react$train.table<-tt[ sort(tt$id, decreasing=T), ]
-}
-
-```
-
-```{r }
-
+ 
 fluidRow(
   column(
     6,
@@ -644,22 +635,11 @@ fluidRow(
                
                fluidRow(
                  column(
-                   width = 6,
-                   # radioGroupButtons(
-                   #   inputId = "myClass",
-                   #   label = "Scegli la classe per ROI",
-                   #   choices =  c("Urbano", "Acqua", "Vegetazione", "Agricolo", "Altro"),
-                   #   # justified = TRUE,
-                   #   direction = "vertical",
-                   #   checkIcon = list(yes = icon("ok",
-                   #                    lib = "glyphicon")
-                   #                    )
-                   #   ),
-                   
+                   width = 5,
                    selectizeInput(
-                     "myClass",
+                     "myTrainingClasses",
                      "Aggiungi/scegli classe POI",
-                     c(),
+                     c( isolate(react$train.table$Class) ),
                      selected = NULL,
                      multiple = F,
                      options = list(create = TRUE)
@@ -677,15 +657,15 @@ fluidRow(
                      )
                    ),
                    div( 
-                     title = "Salva i POI (verranno ricaricati se ricarichi la pagina)",
-                     shinyWidgets::actionBttn(
-                       "saveTrain",
-                       label = "Salva",
-                       size = "sm",
-                       block = F,
-                       style = "fill",
-                       shiny::icon("save")
-                     )
+                     # title = "Salva i POI (verranno ricaricati se ricarichi la pagina)",
+                     # shinyWidgets::actionBttn(
+                     #   "saveTrain",
+                     #   label = "Salva",
+                     #   size = "sm",
+                     #   block = F,
+                     #   style = "fill",
+                     #   shiny::icon("save")
+                     # )
                    ),
                    div( 
                      title = "Rimuovi tutti i POI",
@@ -701,8 +681,8 @@ fluidRow(
                  ),
                  
                  column(
-                   width = 6,
-                   div(style = "height:474px; overflow-y:auto;", DT::dataTableOutput("trainingTable") )
+                   width = 7,
+                   div(  DT::DTOutput("trainingTable" ) )
                  )
                  
                ))
@@ -710,6 +690,85 @@ fluidRow(
   )
   
 )
+
+
+model.names <- list(RF = "Random Forest",
+                    NB = "Naive Bayes",
+                    GMB = "Gradient Boosting Machine",
+                    SVM= "Support Vector Machine",
+                    DL = "Deep Learning")
+```
+
+**Esercizio 1:** Seleziona due combinazione di bande da assegnare ai canali dello schermo tali da: 
+  1. visualizzare a colori reali l'immagine.
+  2. visualizzare il NIR - near infrared
+  3. un'altra combinazione a scelta
+
+**Esercizio 2:** raccogliete 4 firme spettrali, di elementi diversi, e.g. il canale, urbanizzato, vegetazione e la zona industriale.
+
+
+## Classificazione "supervisionata"
+
+We will use only the SWIR because it is a lighter image and takes less time to process in real time and we do not want to be bored waiting for image to classify.
+
+1. Grab some training pixels by choosing the class and start clicking on the image below.
+2. Click **PLOT** if you want to redraw the points that were clicked (image is NOT auto-updated)
+3. Once finished **clic "RUN"** to start training/validation/testing phase of the following models:
+4. You will see a plot of signatures AND classified images
+
+
+
+```{r  }
+ tags$style(HTML('table.dataTable.hover tbody tr:hover, table.dataTable.display tbody tr:hover {background-color: pink !important; cursor:pointer;}'))
+
+
+observeEvent(input$POItableRowHover, { 
+  req(input$POItableRowHover)
+  # print(input$POItableRowHover)
+  # runjs( sprintf(" alert('%s')  ", input$POItableRowHover ) )
+  isolate({
+      runjs( sprintf("enterImg(null); putLens(%d, %d)  ", react$train.table$X[[ input$POItableRowHover[[1]] ]] , react$train.table$Y[[ input$POItableRowHover[[1]] ]] ) )
+ 
+  })
+  #           
+ 
+
+  #runjs( sprintf( "alert('%s')",input$cookie.username ) )
+  })
+
+
+observeEvent(input$cookie.username, { 
+  #runjs( sprintf( "alert('%s')",input$cookie.username ) )
+  req(input$cookie.username)
+  ls<-readRDS("log.rds")
+  if(!is.null(ls[[ input$cookie.username ]] ) ) {
+    ls[[ input$cookie.username ]] <- list("lastlog"=Sys.Date(), "nlogs"=ls[[ input$cookie.username ]][[ "nlogs" ]]+1 )
+  } else {
+    ls[[ input$cookie.username ]]<-list("lastlog"=Sys.Date(), "nlogs"=0)
+  }
+
+  saveRDS(ls,"log.rds")
+  
+  img.file.sigs<<-img.file
+  raster::extension(img.file.sigs)<<-sprintf("%s.rds", fs::path_sanitize(input$cookie.username, "_") )
+  
+  if (file.exists(img.file.sigs)) {
+     tt<-  readRDS(img.file.sigs)
+     react$train.table<-tt[ sort(tt$id, decreasing=T), ]
+     return(NULL)
+  }
+  
+ # img.file.sigs<<-NULL
+  img.file.sigs2<-img.file
+  raster::extension(img.file.sigs2)<-"rds"
+  
+  if (file.exists(img.file.sigs2)) {
+     tt<-  readRDS(img.file.sigs2)
+     saveRDS(tt, img.file.sigs)
+     react$train.table<-tt[ sort(tt$id, decreasing=T), ]
+  }
+
+})
 
 ### zoom LENTI
 shiny::observeEvent(input$zoomLens, {
@@ -722,7 +781,6 @@ shiny::observeEvent(input$zoomLens, {
     )
   )
 }, ignoreInit = T)
-
 
 #### INDEX DOWNLOAD ------
 output$indexDownload <- downloadHandler(
@@ -812,7 +870,6 @@ shiny::observeEvent(input$colorChoose, {
   })
 }, ignoreInit = T)
 
-
 output$myImageDOMplot <- renderPlot({
   req(input$bandR, input$bandG, input$bandB)
   
@@ -845,20 +902,20 @@ output$coordinate<-renderText({
   })
 
 observeEvent(input$plotIndex_hover, {
-  req(input$plotIndex_hover$x)
+  req(out.raster, input$plotIndex_hover$x)
   vv<-raster::cellFromXY(
       myImage ,
       c(input$plotIndex_hover$x, input$plotIndex_hover$y)
     )
-  
-  va<-round( out.raster[vv], 3) 
+  va<-"?"
+  if(is.numeric(vv)){
+      va<-round( out.raster[vv], 3) 
+  }
+
   
   runjs(sprintf( "$('#indexValue').html('<b>Index value at mouse</b><br>%s')", va  ) )
 
 })
-
-
-
 
 observeEvent(input$pannelli, {
  
@@ -869,65 +926,57 @@ observeEvent(input$pannelli, {
  
 }, ignoreInit = T  )
 
-
-
-observeEvent({ input$plot_click
-  input$dimGV } , {
+observeEvent({ input$plot_click; input$dimGV } , {
   
-  req(input$dimGV)
   
  if( input$pannelli=="GV.panel" ){ 
-    # if( as.integer(input$zoomLens)==0 ){
-    #   runjs("highlightWidget( $(\"#zoomLens\"));")
-    #   showNotification("Seleziona una dimensione della lente per visualizzare una finestra sul puntatore mentre ci si muove sull'immagine a sinistra dal quale prendere i valori di grigio")
-    #   return(NULL)
-    # }
- if(!isTruthy(input$plot_click)){
-   output$graphGVtiles <- renderPlotly({  })
-   return(NULL)
- }
+  
+   if(!isTruthy(input$plot_click)){
+     output$graphGVtiles <- renderPlotly({  })
+     return(NULL)
+   }
+     
+   size<- input$dimGV
+   offset <- ((size-1)/2)
    
- size<- input$dimGV
- offset <- ((size-1)/2)
- 
- col1<-raster::colFromX(myImage, input$plot_click$x) - offset
- row1<-raster::rowFromY(myImage, input$plot_click$y) - offset
- 
- runjs( sprintf("  $(\"#finestraGV\").css({ 'visibility':'visible', 'top':'%spx', 'left':'%spx', 'width':'%spx', 'height':'%spx'  }); ",  row1-4, col1-4, size+5, size+5 ) )
- 
- 
- if(col1 < 0){ col1 <- 0 }
- if(row1 < 0){ row1 <- 0 }
- 
- if(col1 > (ncol(myImage)-1) ){ col1 <- ncol(myImage)-1-size }
- if(row1 > (nrow(myImage)-1) ){ row1 <- nrow(myImage)-1-size }
- 
-
- output$graphGVtiles <- renderPlotly({
+   col1<-raster::colFromX(myImage, input$plot_click$x) - offset
+   row1<-raster::rowFromY(myImage, input$plot_click$y) - offset
    
-    
- rast <- as.data.frame( 
-            getValuesBlock(myImage, 
-                row=row1, nrows=size, 
-                col=col1, ncols=size, format="m")
-          )
- 
- rast <- rast / 10000
- b <- lapply(rast, function(x){ matrix(x, nrow=size, ncol=size, byrow=TRUE) })
- 
- rast.m<-reshape2::melt(b)
- names(rast.m)<-c("x","y", "Rifl","Band")
- rast.m$Band<- factor(rast.m$Band, levels=bands.alias )
- 
- 
-   ggplot(rast.m, aes(x=y,y=size-x))  + 
-    geom_raster(aes(fill=Rifl)) +
-    facet_wrap(vars(Band), ncol = 3) +
-    theme_bw() +
-     coord_fixed(expand=F) +
-    scale_fill_distiller(palette = "Greys")
-    })
- 
+   runjs( sprintf("  $(\"#finestraGV\").css({ 'visibility':'visible', 'top':'%spx', 'left':'%spx', 'width':'%spx', 'height':'%spx'  }); ",  row1-4, col1-4, size+5, size+5 ) )
+   
+   
+   if(col1 < 0){ col1 <- 0 }
+   if(row1 < 0){ row1 <- 0 }
+   
+   if(col1 > (ncol(myImage)-1) ){ col1 <- ncol(myImage)-1-size }
+   if(row1 > (nrow(myImage)-1) ){ row1 <- nrow(myImage)-1-size }
+   
+  
+   output$graphGVtiles <- renderPlotly({
+     
+      
+   rast <- as.data.frame( 
+              getValuesBlock(myImage, 
+                  row=row1, nrows=size, 
+                  col=col1, ncols=size, format="m")
+            )
+   
+   rast <- rast / 10000
+   b <- lapply(rast, function(x){ matrix(x, nrow=size, ncol=size, byrow=TRUE) })
+   
+   rast.m<-reshape2::melt(b)
+   names(rast.m)<-c("x","y", "Rifl","Band")
+   rast.m$Band<- factor(rast.m$Band, levels=bands.alias )
+   
+   
+     ggplot(rast.m, aes(x=y,y=size-x))  + 
+      geom_raster(aes(fill=Rifl)) +
+      facet_wrap(vars(Band), ncol = 3) +
+      theme_bw() +
+       coord_fixed(expand=F) +
+      scale_fill_distiller(palette = "Greys")
+      })
+   
  }
   
  if( input$pannelli=="firme.panel" ){ 
@@ -954,6 +1003,35 @@ observeEvent({ input$plot_click
   }
   
 
+ if( input$pannelli=="classificazione.panel" ){
+   
+   Class<-isolate(input$myTrainingClasses)
+   
+   if(!isTruthy(Class)){
+     shinyjs::alert("Devi selezionare una classe dalla lista o crearne una!")
+     return(NULL)
+   }
+   
+   
+  col1<-raster::colFromX(myImage, input$plot_click$x) 
+  row1<-raster::rowFromY(myImage, input$plot_click$y)
+   
+  dt<-isolate(react$train.table)
+  row<-list(
+        id = nrow(dt)+1,
+        East =  input$plot_click$x ,
+        North =  input$plot_click$y,
+        X = col1 ,
+        Y = row1 ,
+        Class = Class
+      )
+   
+  dt.final<- rbind( row, react$train.table  )
+  react$train.table<-dt.final
+ 
+  if(!is.null(img.file.sigs) ) saveRDS(dt.final, img.file.sigs)
+  
+  }
   
 }, ignoreInit = T )
 
@@ -995,55 +1073,8 @@ output$graph1 <- renderPlotly({
          color = "black",
          size = 9
        )
-     )
-   
-   
+     ) 
 })
-
-model.names <- list(RF = "Random Forest",
-                    NB = "Naive Bayes",
-                    GMB = "Gradient Boosting Machine",
-                    SVM= "Support Vector Machine",
-                    DL = "Deep Learning")
-```
-
-**Esercizio 1:** Seleziona due combinazione di bande da assegnare ai canali dello schermo tali da: 
-  1. visualizzare a colori reali l'immagine.
-  2. visualizzare il NIR - near infrared
-  3. un'altra combinazione a scelta
-
-**Esercizio 2:** raccogliete 4 firme spettrali, di elementi diversi, e.g. il canale, urbanizzato, vegetazione e la zona industriale.
-
-
-## Classificazione "supervisionata"
-
-We will use only the SWIR because it is a lighter image and takes less time to process in real time and we do not want to be bored waiting for image to classify.
-
-1. Grab some training pixels by choosing the class and start clicking on the image below.
-2. Click **PLOT** if you want to redraw the points that were clicked (image is NOT auto-updated)
-3. Once finished **clic "RUN"** to start training/validation/testing phase of the following models:
-4. You will see a plot of signatures AND classified images
-
-
-
-```{r  }
-
-
-observeEvent(input$cookie.username, { 
-  #runjs( sprintf( "alert('%s')",input$cookie.username ) )
-  })
-
-
-observeEvent(input$saveTrain, {
-  
-  img.file.sigs<-img.file
-  raster::extension(img.file.sigs)<-"rds"
-  if(file.exists(img.file.sigs)) runjs("alert('Attenzione, sovrascrivo il file se esistente');")
-  saveRDS(isolate(react$train.table), img.file.sigs)
- 
-})
-
-
 
 
 observeEvent(input$plotTrain, {
@@ -1080,9 +1111,7 @@ observeEvent(input$plotTrain, {
 
 })
 
-
-
-output$trainingTable <- DT::renderDataTable({
+output$trainingTable <- DT::renderDT({
  
   req(react$train.table, input$pannelli)
   if(input$pannelli!="classificazione.panel"){
@@ -1090,70 +1119,54 @@ output$trainingTable <- DT::renderDataTable({
     return(NULL)
   }
   
+  callback <- c( 
+  "table.on('mouseenter', 'tr', function(){", 
+  "  var index = table.row(this).data();",
+  " if(index!=='undefined') Shiny.setInputValue('POItableRowHover', index[0], {priority: 'event'});",
+  "});"
+)
+  
   col <- RColorBrewer::brewer.pal(9, "Paired")
   col2 <- RColorBrewer::brewer.pal(9, "Pastel1")
   train.table.classes <- as.factor(react$train.table$Class)
 
-  runjs( sprintf("draw( %s,  %s,  %s,  %s, '%s')", 
-                 jsonlite::toJSON(colFromX(myImage, react$train.table[, "x"]) ),
-                 jsonlite::toJSON(rowFromY(myImage, react$train.table[, "y"]) ),
+  runjs( sprintf("draw( %s,  %s,  %s,  %s)", 
+                 jsonlite::toJSON(colFromX(myImage, react$train.table[, "X"]) ),
+                 jsonlite::toJSON(rowFromY(myImage, react$train.table[, "Y"]) ),
                  jsonlite::toJSON( react$train.table[, "id"]  ),
                  jsonlite::toJSON(col2[train.table.classes])
                  ) );
   
-  DT::datatable(
+  datatable(
     react$train.table,
     rownames = FALSE,
+      callback = JS(callback),
+    #callback = JS(callback),
     extensions = 'Scroller',
-    options = list(
+    options = list( 
       class = "display nowrap compact",
       pageLength = 1000, 
-      scrollY = 200,
-      scroller = TRUE,
-    server = FALSE,
+      scrollY = 250,
+      scroller = TRUE, 
       dom = 'ft'
     )
-  )
+  ) %>% formatRound(c(2:3), 2)
   
 })
 
 observeEvent(input$resetTrain,  {
   isolate({
     react$train.table <-
-      data.frame(
-        id = integer(0),
-        x = integer(0) ,
-        y = integer(0),
-        Class = character(0)
-      )
+     data.frame(
+      id = integer(0),
+      East = numeric(0) ,
+      North = numeric(0),
+      X = integer(0) ,
+      Y = integer(0),
+      Class = character(0)
+    )
   })
 })
-
-observeEvent(input$plot_dblclick,  {
- 
-  req(input$myClass)
-  isolate({
-    react$train.table <-
-      rbind(
-        list(
-          id = as.integer(nrow(react$train.table) + 1),
-          x = as.integer(input$plot_dblclick$x),
-          y = as.integer(input$plot_dblclick$y),
-          Class = input$myClass
-        ),
-        react$train.table
-      )
-  })
-})
-
-
-
-fluidRow(column(width = 12, shinyWidgets::addSpinner(plotOutput("plot3"))))
-
-fluidRow(column(width = 12, shinyWidgets::addSpinner(plotOutput("plot4"))))
-
-fluidRow(column(width = 12, shinyWidgets::addSpinner(plotOutput("plot5"))))
-
 
 observeEvent(input$runTrain, {
   
@@ -1207,8 +1220,8 @@ observeEvent(input$runTrain, {
           as.numeric(
             gdalUtils::gdallocationinfo(
               img.file, geoloc=T, 
-              react$train.table[i, "x"]  ,
-              react$train.table[i, "y"],
+              react$train.table[i, "X"]  ,
+              react$train.table[i, "Y"],
               valonly = T
             )
           )
@@ -1468,12 +1481,3 @@ observeEvent(input$runTrain, {
 
 
 ```
-
-&nbsp;
-
-
-
-&nbsp;
-
-
-&nbsp;
