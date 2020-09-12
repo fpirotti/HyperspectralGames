@@ -276,6 +276,7 @@ useShinyjs(rmd = TRUE)
  
 loaded<-F
 out.raster<-NULL
+currClass<-NULL
 #saveRDS(s2.bands, "s2.bands.rds")
 s2.bands<-readRDS("s2.bands.rds")
 band.colors<-c("#680085", "#0036ff", "#09ff00", "#ed0000", "#e70000", "#e70000", 
@@ -638,7 +639,7 @@ fluidRow(
                    selectizeInput(
                      "myTrainingClasses",
                      "Aggiungi/scegli classe POI",
-                     c( isolate(react$train.table$Class) ),
+                     choices = c( "" ),
                      selected = NULL,
                      multiple = F,
                      options = list(create = TRUE)
@@ -920,7 +921,7 @@ observeEvent(input$pannelli, {
  
 }, ignoreInit = T  )
 
-observeEvent({ input$plot_click; input$dimGV } , {
+observeEvent( input$plot_click  , {
   
   
  if( input$pannelli=="GV.panel" ){ 
@@ -936,7 +937,7 @@ observeEvent({ input$plot_click; input$dimGV } , {
    col1<-raster::colFromX(myImage, input$plot_click$x) - offset
    row1<-raster::rowFromY(myImage, input$plot_click$y) - offset
    
-   runjs( sprintf("  $(\"#finestraGV\").css({ 'visibility':'visible', 'top':'%spx', 'left':'%spx', 'width':'%spx', 'height':'%spx'  }); ",  row1-4, col1-4, size+5, size+5 ) )
+   runjs( sprintf("  $(\"#finestraGV\").css({ 'visibility':'visible', 'top':'%spx', 'left':'%spx', 'width':'%spx', 'height':'%spx'  }); ",  row1-2, col1-2, size+4, size+4 ) )
    
    
    if(col1 < 0){ col1 <- 0 }
@@ -1000,13 +1001,14 @@ observeEvent({ input$plot_click; input$dimGV } , {
  if( input$pannelli=="classificazione.panel" ){
    
    Class<-isolate(input$myTrainingClasses)
-   
+
    if(!isTruthy(Class)){
      shinyjs::alert("Devi selezionare una classe dalla lista o crearne una!")
+        currClass<<-NULL
      return(NULL)
    }
    
-   
+  currClass<<-Class  
   col1<-raster::colFromX(myImage, input$plot_click$x) 
   row1<-raster::rowFromY(myImage, input$plot_click$y)
    
@@ -1112,6 +1114,9 @@ output$trainingTable <- DT::renderDT({
     return(NULL)
   }
   
+  
+  shiny::updateSelectizeInput(session = session, inputId =  "myTrainingClasses", choices = c("", unique(react$train.table$Class) ), selected=currClass ) 
+  
   callback <- c( 
   "table.on('mouseenter', 'tr', function(){", 
   " var index = table.row(this);", 
@@ -1143,7 +1148,7 @@ output$trainingTable <- DT::renderDT({
       scroller = TRUE, 
       dom = 'ft'
     )
-  ) %>% formatRound(c(2:3), 2)
+  ) %>% formatRound(c(1:2), 2)
   
 })
 
