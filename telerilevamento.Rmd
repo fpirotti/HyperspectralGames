@@ -1081,8 +1081,8 @@ observeEvent(input$plotTrain, {
       train.table.classes <- as.factor(react$train.table$Class)
 
       runjs( sprintf("draw( %s,  %s,  %s,  %s)", 
-                     jsonlite::toJSON(colFromX(myImage, react$train.table$X) ),
-                     jsonlite::toJSON(rowFromY(myImage, react$train.table$Y) ),
+                     jsonlite::toJSON(colFromX(myImage, react$train.table$East) ),
+                     jsonlite::toJSON(rowFromY(myImage, react$train.table$North) ),
                      jsonlite::toJSON( rownames(react$train.table)  ),
                      jsonlite::toJSON(col2[train.table.classes]) ) );
       # points(
@@ -1129,8 +1129,8 @@ output$trainingTable <- DT::renderDT({
   train.table.classes <- as.factor(react$train.table$Class)
 
   runjs( sprintf("draw( %s,  %s,  %s,  %s)", 
-                 jsonlite::toJSON(colFromX(myImage, react$train.table$X) ),
-                 jsonlite::toJSON(rowFromY(myImage, react$train.table$Y) ),
+                     jsonlite::toJSON(colFromX(myImage, react$train.table$East) ),
+                     jsonlite::toJSON(rowFromY(myImage, react$train.table$North) ),
                  jsonlite::toJSON( rownames(react$train.table)  ),
                  jsonlite::toJSON(col2[train.table.classes])
                  ) );
