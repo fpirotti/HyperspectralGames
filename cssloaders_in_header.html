@@ -194,7 +194,7 @@ function draw(x, y, ids, colors) {
   
   $(".myCanvasTrain").remove();
   for(var i=0; i<x.length; ++i){
-       var myCanvas = $('<div/>',{'class':'myCanvasTrain', 'title': 'id='+ids[i], 'style':'left:'+x[i]+'px;top:'+y[i]+'px;', id: 'myCanvas'+ids[i]   } );
+       var myCanvas = $('<div/>',{'class':'myCanvasTrain', 'title': 'id='+ids[i], 'style':'left:'+(x[i]-3)+'px;top:'+(y[i]-3)+'px;', id: 'myCanvas'+ids[i]   } );
 $('#myImageDOMplot').parent().append(myCanvas);
     } 
 }

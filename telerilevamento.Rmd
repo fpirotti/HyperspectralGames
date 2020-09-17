@@ -3,7 +3,7 @@ title: "Analizzare Immagini Digitali: dalla Visualizzazione all'Intelligenza Art
 author: "Francesco Pirotti - CIRGEO / TESAF  - Università di Padova"
 date: "27/8/2020" 
 output:
-  html_notebook:
+  html_document:
     toc: yes
  # html_document:
  # ioslides_presentation: 
@@ -28,14 +28,18 @@ library(tidyverse)
 shiny::addResourcePath("shinyjs", system.file("srcjs", package = "shinyjs"))
 ```
 ```{r, context="server"}
-shinyjs::useShinyjs(html = TRUE)
+#shinyjs::useShinyjs(html = TRUE)
 ```
 
 ```{css, echo=FALSE}
 .irs-bar-edge, .irs-bar {
   display:none;
 }
-  
+
+table.dataTable.hover tbody tr:hover, table.dataTable.display tbody tr:hover {
+  background-color: pink !important; cursor:pointer;
+}
+
 #coordinate {
     height: 36px;
     margin: 0;
@@ -79,8 +83,8 @@ shinyjs::useShinyjs(html = TRUE)
 }
 
 .myCanvasTrain{
-  width:5px;
-  height:5px;
+  width:4px;
+  height:4px;
   border:solid 2px red;
   z-index:999;
   position:absolute;
@@ -98,6 +102,7 @@ div.main-container{
 }
 .img-zoom-result {
   position:absolute;
+  pointer-events: none;
   background-repeat:space;
   border: 2px solid rgb(255, 0 ,0); 
   width: 160px;
@@ -109,6 +114,7 @@ div.main-container{
 .img-zoom-result-inner {   
   border: 2px solid rgb(255, 0 ,0); 
   width: 10px;
+  pointer-events: none;
   height: 10px;
   margin:75px auto;
   z-index:99999;
@@ -597,7 +603,9 @@ fluidRow(
                 "Atmospherically Resistant Vegetation Index 2" =
                   "-0.18+1.17*(B9-B5)/(B9+B5)",
                 "NDVI" =
-                  "(B8A-B4)/(B8A+B4)"
+                  "(B8A-B4)/(B8A+B4)",
+                "EVI" =
+                  "2.5*((B9-B5)/(B9+B5+B1))"
               )
             ),
             div(
@@ -644,18 +652,7 @@ fluidRow(
                      multiple = F,
                      options = list(create = TRUE)
                    ),
-                   div( style="display:flex;gap:5px;",
-                    div( 
-                     title = "Disegna i POI sulla mappa a sinistra", 
-                     shinyWidgets::actionBttn(
-                       "plotTrain",
-                       label = "Disegna",
-                       size = "sm",
-                       block = F,
-                       style = "fill",
-                       shiny::icon("pen")
-                     )
-                    ),
+                   div( style="display:flex;gap:5px;", 
                     div( 
                      title = "Elimina le righe selezionate",
                      shinyWidgets::actionBttn(
@@ -678,7 +675,33 @@ fluidRow(
                        shiny::icon("trash")
                      )
                     )
-                   )
+                   ),
+                   
+                  div( 
+                     title = "Estrai firme spettrali dai POI creati aggregandoli per classe", 
+                     shinyWidgets::actionBttn(
+                       "plotTrain",
+                       label = "Calcola Firme Spettrali",
+                       size = "sm",
+                       block = F,
+                       style = "fill",
+                       shiny::icon("pen")
+                     )
+                    ),
+                   
+                  div( 
+                     title = "Applica classificazione", 
+                     shinyWidgets::actionBttn(
+                       "classTrain",
+                       label = "Classifica",
+                       size = "sm",
+                       block = F,
+                       style = "fill",
+                       shiny::icon("pen")
+                     )
+                    )
+                   
+                   
                  ),
                  
                  column(
@@ -686,7 +709,10 @@ fluidRow(
                    div(  DT::DTOutput("trainingTable" ) )
                  )
                  
-               ))
+               ), 
+               
+       shinycssloaders::withSpinner( plotlyOutput("plotTrainSignature" , height = 500), type = 1, hide.ui = F )
+       )
     )
   )
   
@@ -719,9 +745,9 @@ We will use only the SWIR because it is a lighter image and takes less time to p
 
 
 
-```{r  }
- tags$style(HTML('table.dataTable.hover tbody tr:hover, table.dataTable.display tbody tr:hover {background-color: pink !important; cursor:pointer;}'))
+```{r, context="server"  }
 
+output$graphGVtiles <- renderPlotly({ })
 
 observeEvent(input$POItableRowHover, {  
   req(input$POItableRowHover, !is.na(as.integer(input$POItableRowHover[[1]])))
@@ -1072,39 +1098,124 @@ output$graph1 <- renderPlotly({
 })
 
 
+
 observeEvent(input$plotTrain, {
   req(input$plotTrain)
-  isolate({
-    if (shiny::isTruthy(react$train.table) && nrow(react$train.table)) {
-      col <- RColorBrewer::brewer.pal(9, "Paired")
-      col2 <- RColorBrewer::brewer.pal(9, "Pastel1")
-      train.table.classes <- as.factor(react$train.table$Class)
-
-      runjs( sprintf("draw( %s,  %s,  %s,  %s)", 
-                     jsonlite::toJSON(colFromX(myImage, react$train.table$East) ),
-                     jsonlite::toJSON(rowFromY(myImage, react$train.table$North) ),
-                     jsonlite::toJSON( rownames(react$train.table)  ),
-                     jsonlite::toJSON(col2[train.table.classes]) ) );
-      # points(
-      #   react$train.table$x,
-      #   react$train.table$y,
-      #   col = col[train.table.classes],
-      #   bg = col2[train.table.classes],
-      #   pch = 21
-      # )
-      # 
-      # text(
-      #   react$train.table$x,
-      #   react$train.table$y,
-      #   pos = 2,
-      #   react$train.table$id,
-      #   col = col[train.table.classes]
-      # )
-
+  
+  
+  
+  
+  ss <<-
+    matrix(
+      data = NA,
+      nrow = nrow(react$train.table),
+      ncol = length( bands.wavelengths.nm)
+    )
+  withProgress(
+    message = "Leggo le firme spettrali", 
+    value = 0,
+    min = 0,
+    max = nrow(react$train.table),
+    {
+      for (i in 1:nrow(react$train.table)) {
+        setProgress(as.integer(i), detail=sprintf("Punto %s", i))
+        ss[i,] <-
+          as.numeric(
+            gdalUtils::gdallocationinfo(
+              img.file, geoloc=T, 
+              react$train.table[i, "East"]  ,
+              react$train.table[i, "North"],
+              valonly = T
+            )
+          )
+      }
     }
-  })
+  )
+  
+   
+    
+   train.data <-
+    as.data.frame(cbind(react$train.table[c("Class")], ss))
+  
+  ###############################################################################
+  ### from here  is only for plotting - our training data is  "train.data"
+  quants <- c(0.1, 0.25, 0.5, 0.75, 0.9)
+  df.with.ss2 <-
+    train.data  %>%  dplyr::group_by(Class) %>% dplyr::summarize_all(function(x) {
+      if (is.numeric(x))
+        quantile(as.numeric(x), quants)
+      else
+        c(0, 0, 0, 0, 0)
+    })
+  
+  df.with.ss2$Quantile <-
+    rep(sprintf("Q%s", quants * 100), length(unique(df.with.ss2$Class)))
+  #saveRDS(as.data.frame(df.with.ss2), "df.with.ss2.rds")
+  
+  df.with.ss3 <- reshape2::melt(df.with.ss2)
+  df.with.ss4 <-
+    reshape2::dcast(df.with.ss3 ,   Class + variable ~ Quantile)
+  df.with.ss4$Wavelength <-
+    bands.wavelengths.nm[df.with.ss4$variable]
+  df.with.ss4[df.with.ss4 == 0] <- NA
+  
+  output$plotTrainSignature <- plotly::renderPlotly ({
+      ggplot(df.with.ss4,
+             aes(
+               x = Wavelength,
+               y = Q50,
+               group = Class,
+               fill = Class,
+               color = Class
+             )) +
+      geom_point() +
+      geom_ribbon(aes(ymin = Q25,  ymax = Q75),
+                  alpha = .3,
+                  linetype = 0) +
+      xlab("Wavelength (nm)") +
+      ylab("Radiance at sensor") +
+      ggtitle("Trainer signatures - Q50 and IQR") +
+      theme_bw() 
+  })  
+    
+     
 
 })
+
+# 
+# observeEvent(input$plotTrain, {
+#   req(input$plotTrain)
+#   isolate({
+#     if (shiny::isTruthy(react$train.table) && nrow(react$train.table)) {
+#       col <- RColorBrewer::brewer.pal(9, "Paired")
+#       col2 <- RColorBrewer::brewer.pal(9, "Pastel1")
+#       train.table.classes <- as.factor(react$train.table$Class)
+# 
+#       runjs( sprintf("draw( %s,  %s,  %s,  %s)", 
+#                      jsonlite::toJSON(colFromX(myImage, react$train.table$East) ),
+#                      jsonlite::toJSON(rowFromY(myImage, react$train.table$North) ),
+#                      jsonlite::toJSON( rownames(react$train.table)  ),
+#                      jsonlite::toJSON(col2[train.table.classes]) ) );
+#       # points(
+#       #   react$train.table$x,
+#       #   react$train.table$y,
+#       #   col = col[train.table.classes],
+#       #   bg = col2[train.table.classes],
+#       #   pch = 21
+#       # )
+#       # 
+#       # text(
+#       #   react$train.table$x,
+#       #   react$train.table$y,
+#       #   pos = 2,
+#       #   react$train.table$id,
+#       #   col = col[train.table.classes]
+#       # )
+# 
+#     }
+#   })
+# 
+# })
 
 output$trainingTable <- DT::renderDT({
  
@@ -1119,8 +1230,8 @@ output$trainingTable <- DT::renderDT({
   
   callback <- c( 
   "table.on('mouseenter', 'tr', function(){", 
-  " var index = table.row(this);", 
-  " if(index!==undefined) {  Shiny.setInputValue('POItableRowHover', index[0], {priority: 'event'}); }",
+  " var index = table.row(this); var colIndex = table.columns().header().toArray().map(x => x.innerText).indexOf(\"\");  ", 
+  " if(index!==undefined) {  Shiny.setInputValue('POItableRowHover', index.data()[colIndex], {priority: 'event'}); }",
   "});"
   )
   
@@ -1267,26 +1378,7 @@ observeEvent(input$runTrain, {
     bands.wavelengths.nm[df.with.ss4$variable]
   df.with.ss4[df.with.ss4 == 0] <- NA
   
-  output$plot3 <- renderPlot({
-    p <-
-      ggplot(df.with.ss4,
-             aes(
-               x = Wavelength,
-               y = Q50,
-               group = Class,
-               fill = Class,
-               color = Class
-             )) +
-      geom_point() +
-      geom_ribbon(aes(ymin = Q25,  ymax = Q75),
-                  alpha = .3,
-                  linetype = 0) +
-      xlab("Wavelength (nm)") +
-      ylab("Radiance at sensor") +
-      ggtitle("Trainer signatures - Q50 and IQR") +
-      theme_bw()
-    print(p)
-  })
+ 
   
   
   ###############################################################################
