@@ -290,7 +290,7 @@ fluidRow(column(width = 12, shinyWidgets::addSpinner(
 fluidRow(
   column(
     width = 4,
-    radioGroupButtons(
+    shinyWidgets::radioGroupButtons(
       inputId = "myClass",
       label = "Choose class",
       choices =  c("Background", "White target", "Healty Plant", "Stressed Plant"),

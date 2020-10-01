@@ -24,7 +24,8 @@ knitr::opts_chunk$set(echo = FALSE, message=FALSE )
 library(tidyverse)
 ```
 
-```{r, echo=FALSE}
+
+```{r, context="server", echo=FALSE}
 shiny::addResourcePath("shinyjs", system.file("srcjs", package = "shinyjs"))
 ```
 ```{r, context="server"}
@@ -258,11 +259,7 @@ $( document ).ready(function() {
 ``` 
 
 
-```{r message=FALSE }
-
-# htmltools::tagList(
-#   htmltools::tags$script(src = "./libs/js.cookie.min.js")
-# )
+```{r, context="server"  }
 library(DT)
 library(shinyWidgets)
 library(shinycssloaders)
@@ -279,6 +276,14 @@ library(rasclass)
 library(dygraphs)
 library(h2o) ## A.I. library
 useShinyjs(rmd = TRUE)
+```
+
+```{r, context="server", message=FALSE }
+
+# htmltools::tagList(
+#   htmltools::tags$script(src = "./libs/js.cookie.min.js")
+# )
+
  
 loaded<-F
 out.raster<-NULL
@@ -444,15 +449,9 @@ Vengono proposti esercizi nelle varie sezioni che potete eseguire con l'interfac
 ## ANALISI DELL'IMMAGINE
 
 
-```{r }
+```{r, context="render" }
  
-react <- reactiveValues(train.table = data.frame(
-  East = numeric(0) ,
-  North = numeric(0),
-  X = integer(0) ,
-  Y = integer(0),
-  Class = character(0)
-))
+
 
 ## check if there is user file for this image:
 
@@ -711,7 +710,9 @@ fluidRow(
                  
                ), 
                
-       shinycssloaders::withSpinner( plotlyOutput("plotTrainSignature" , height = 500), type = 1, hide.ui = F )
+       shinycssloaders::withSpinner( plotlyOutput("plotTrainSignature" , height = 500), type = 1, hide.ui = F ),
+       shinycssloaders::withSpinner(  imageOutput("plot4"  ), type = 1, hide.ui = F ),
+       shinycssloaders::withSpinner( imageOutput("plot5"  ), type = 1, hide.ui = F )
        )
     )
   )
@@ -721,6 +722,7 @@ fluidRow(
 
 model.names <- list(RF = "Random Forest",
                     NB = "Naive Bayes",
+                    KNN = "K-Nearest Neighbour",
                     GMB = "Gradient Boosting Machine",
                     SVM= "Support Vector Machine",
                     DL = "Deep Learning")
@@ -746,7 +748,13 @@ We will use only the SWIR because it is a lighter image and takes less time to p
 
 
 ```{r, context="server"  }
-
+react <- reactiveValues(train.table = data.frame(
+  East = numeric(0) ,
+  North = numeric(0),
+  X = integer(0) ,
+  Y = integer(0),
+  Class = character(0)
+))
 output$graphGVtiles <- renderPlotly({ })
 
 observeEvent(input$POItableRowHover, {  
@@ -1174,7 +1182,7 @@ observeEvent(input$plotTrain, {
                   linetype = 0) +
       xlab("Wavelength (nm)") +
       ylab("Radiance at sensor") +
-      ggtitle("Trainer signatures - Q50 and IQR") +
+      ggtitle("Spectral signatures of POIs - Q50 and IQR") +
       theme_bw() 
   })  
     
@@ -1287,9 +1295,9 @@ observeEvent(input$resetTrain,  {
   })
 })
 
-observeEvent(input$runTrain, {
+observeEvent(input$classTrain, {
   
-  req(input$runTrain, react$train.table)
+  req(input$classTrain, react$train.table)
   
  # saveRDS(react$train.table, "s2.train.table.rds")
   
@@ -1339,8 +1347,8 @@ observeEvent(input$runTrain, {
           as.numeric(
             gdalUtils::gdallocationinfo(
               img.file, geoloc=T, 
-              react$train.table[i, "X"]  ,
-              react$train.table[i, "Y"],
+              react$train.table[i, "East"]  ,
+              react$train.table[i, "North"],
               valonly = T
             )
           )
@@ -1348,8 +1356,8 @@ observeEvent(input$runTrain, {
     }
   )
   
-  if (is.null(ss)) {
-    shinyjs::alert("ISNULL!")
+  if (is.na(ss[1,1])) {
+    shinyjs::alert("Signature matrix is NaN!")
     return(NULL)
   }
   
@@ -1565,12 +1573,13 @@ observeEvent(input$runTrain, {
 
                  
                })
-  
-                 print("9")
-                    rb.rminer <- raster::brick(rasters.rminer)
+   
+                  img.file.out<-img.file
+                  raster::extension(img.file.out)<-sprintf("%s_rminer.tif", fs::path_sanitize(input$cookie.username, "_") )
+                  rb.rminer <- raster::brick(rasters.rminer)
+                  writeRaster(rb.miner, img.file.out)
                   output$plot5 <- renderPlot({  levelplot(rb.rminer,  xlab = "X", ylab = "Y", main="Modelli da libreria rminer")  })
-  
-                 print("99")
+   
                     lu <- levelplot(rb,  xlab = "X", ylab = "Y")
                   
                   output$plot4 <- renderPlot({  lu  })
